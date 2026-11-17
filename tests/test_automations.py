@@ -546,9 +546,8 @@ def test_exclusion_toggle_in_html_report(tmp_path):
     autos = [Automation("all", "exclude", "port = 80")]
     a = analyze(inv, scans, [], automations=autos, force_pn=True)
     doc = open(write_html(a, str(tmp_path)), encoding="utf-8").read()
-    assert "excl-toggle" in doc
-    assert "toggleExcluded" in doc
-    assert "Show exclusions" in doc
+    assert 'class="btn excl-toggle"' in doc
+    assert "(1)</small>" in doc  # the count badge
 
 
 def test_script_in_automation_name_is_escaped(tmp_path):
@@ -569,7 +568,33 @@ def test_script_in_automation_name_is_escaped(tmp_path):
     autos = [Automation("<script>alert(1)</script>", "exclude", "port = 80")]
     a = analyze(inv, scans, [], automations=autos, force_pn=True)
     doc = open(write_html(a, str(tmp_path)), encoding="utf-8").read()
-    assert "<script>alert(1)</script>" not in doc.split("</style>", 1)[-1].split("<script>")[0]
+    assert "<script>alert(1)</script>" not in doc
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in doc
+
+
+def test_exclusion_removes_findings(tmp_path):
+    """An exclusion on an open port that the Flow Policy denies removes that Finding."""
+    from segowl.analysis import analyze
+    from segowl.policy import load_policy
+
+    inv = load_inventory(str(MISSION / "inventory.csv"))
+    scans = {
+        "172.31.250.1": [
+            Scan(
+                path="x.xml",
+                source="172.31.250.1",
+                hosts={"172.31.250.10": HostRecord(state="up", ports=[(22, "tcp", "open")])},
+            )
+        ]
+    }
+    policy = load_policy("policy.csv", inv, {}, text="audit;dmz;22;deny;no ssh\n")
+    # without exclusion: one Finding
+    a0 = analyze(inv, scans, [], policy=policy, force_pn=True)
+    assert len(a0.findings) == 1
+    # with exclusion: Finding gone
+    autos = [Automation("no-ssh", "exclude", "port = 22 and state = open")]
+    a1 = analyze(inv, scans, [], automations=autos, policy=policy, force_pn=True)
+    assert len(a1.findings) == 0
 
 
 # ---------------------------------------------------------------- app: Automations CRUD

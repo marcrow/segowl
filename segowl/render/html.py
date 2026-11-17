@@ -1185,7 +1185,9 @@ def _excl_toggle(a: Analysis) -> str:
     total = sum(es.match_count for es in a.exclusion_stats)
     return (
         f'<button class="btn excl-toggle" onclick="toggleExcluded()">'
-        f"Show exclusions <small>({total})</small></button>"
+        f'<span class="excl-show">Show exclusions</span>'
+        f'<span class="excl-hide">Hide exclusions</span>'
+        f" <small>({total})</small></button>"
     )
 
 
