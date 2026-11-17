@@ -1,6 +1,6 @@
 # Prototype: target filter in script generation
 
-Status: ready-for-agent
+Status: prototype-ready
 Blocked by: –
 Spec: ../spec.md
 Type: prototype
