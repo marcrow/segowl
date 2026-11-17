@@ -275,7 +275,7 @@ def _source_table_html(src: str, a: Analysis) -> str:
 
 VERDICT_TIP = {
     OPEN: "At least one open port: a service is reachable",
-    REACH: "No open port but a closed port answered (RST): L4 flow crosses",
+    REACH: "No open port but a closed port answered (RST): a TCP stack replied at L4",
     ALIVE: "Answers ping/ARP but no port gets through — scan deeper",
     BLOCK: "No answer to discovery, or only filtered ports",
     NODATA: "This Interface was not in the Scan output",
