@@ -1107,6 +1107,8 @@ def make_handler(mission: Mission, users_file: Path, secure: bool, allowed_hosts
 
         def _scan_file(self, scans_root: Path, stem: str):
             """Serve a scan file as text/plain; try .nmap > .gnmap > .xml (best for reading)."""
+            if "\x00" in stem:
+                return self._send(404, b"not found", "text/plain")
             root = scans_root.resolve()
             for ext in (".nmap", ".gnmap", ".xml"):
                 target = (scans_root / (stem + ext)).resolve()
