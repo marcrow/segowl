@@ -14,6 +14,7 @@ The verdict of a Source → Interface pair, from most permissive to most closed:
 | `~` | ALIVE | Answers ping/ARP, no port gets through: scan it deeper. Never in a `-Pn` Scan. |
 | `x` | BLOCKED | Down, or only filtered ports under `-Pn`. |
 | `.` | UNSEEN | Absent from the scan output. |
+| `⊘` | EXCLUDED | All observations removed by exclusion Automations. |
 
 ## Two views of the same scans
 
@@ -40,11 +41,12 @@ Machine has its own colour; single-interface Machines stay white.
 | **Pivot Machines** | Machines spanning several Zones that a Source reaches: one hop into their other Zones |
 | **Per source** | What each Source reaches |
 | **Per target** | Who reaches each target |
-| **Scans** | Every Scan (file, date, command, tested ports, conflicts), Coverage per target, anomalies |
+| **Scans** | Every Scan, Coverage, anomalies, and the Exclusion Automations section (match counts, affected Zones) |
 | **Diff** | Before / after, Source vs Source |
 
 The **Port Group** chips filter every tab at once. Matrix cells show in a tooltip the Scans behind their
-verdict.
+verdict. The **Show exclusions** toggle reveals excluded ports and masked Findings greyed out in every table
+(state saved in localStorage). Diagrams, Pivot cards and Diff are not affected.
 
 ### Retest: the Diff tab
 

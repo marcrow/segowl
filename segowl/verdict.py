@@ -46,6 +46,8 @@ class Cell:
     conflicts: dict[tuple[int, str], dict[str, str]] = field(default_factory=dict)  # port -> {scan: state}
     tested: dict[str, Ranges] = field(default_factory=dict)  # Coverage: proto -> ports tested
     coverage_known: bool = True  # False when a Scan behind the cell is not XML
+    excluded_ports: list[Port] = field(default_factory=list)  # ports removed by Automations
+    was: int | None = None  # pre-exclusion verdict, set only when it differs from the final one
 
     def is_tested(self, port: int, proto: str = "tcp") -> bool | None:
         """True/False when Coverage says so, None when it cannot tell (non-XML Scan, port not in XML ones)."""

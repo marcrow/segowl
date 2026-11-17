@@ -87,6 +87,7 @@ def build_matrix(
 class ZoneAgg:
     verdict: int = NODATA  # the most permissive verdict of the pairs
     open_ports: set[Port] = field(default_factory=set)
+    excluded_ports: set[Port] = field(default_factory=set)
     pass_pairs: int = 0  # pairs at that verdict
     total_pairs: int = 0
 
@@ -96,16 +97,25 @@ ZoneMatrix = dict[tuple[str, str], ZoneAgg]
 
 def aggregate_zones(matrix: Matrix, inv: Inventory) -> ZoneMatrix:
     agg: ZoneMatrix = defaultdict(ZoneAgg)
+    has_excluded: set[tuple[str, str]] = set()
     for s, row in matrix.items():
         zs = inv[s].zone
         for d, c in row.items():
-            a = agg[(zs, inv[d].zone)]
+            key = (zs, inv[d].zone)
+            a = agg[key]
             a.total_pairs += 1
             if c.verdict > a.verdict:
                 a.verdict, a.pass_pairs = c.verdict, 0
             if c.verdict == a.verdict:
                 a.pass_pairs += 1
             a.open_ports.update(c.open_ports)
+            a.excluded_ports.update(c.excluded_ports)
+            if c.verdict == EXCLUDED:
+                has_excluded.add(key)
+    for key in has_excluded:
+        a = agg[key]
+        if a.verdict == NODATA:
+            a.verdict = EXCLUDED
     return agg
 
 
@@ -284,6 +294,32 @@ class Analysis:
     def undeclared(self) -> list[tuple[str, str, Port]]:
         return [(s, d, p) for (s, d, p), r in self.decisions.items() if r is None]
 
+    @cached_property
+    def masked_findings(self) -> list[tuple[str, str, Port, Rule]]:
+        """Findings that would exist without exclusions: excluded ports the Flow Policy denies."""
+        if self.policy is None:
+            return []
+        return [
+            (s, d, p, r)
+            for s, row in self.matrix.items()
+            for d, c in row.items()
+            for p in c.excluded_ports
+            if (r := decide(self.policy, self.inv[s], self.inv[d], p)) is not None and r.action == DENY
+        ]
+
+    @cached_property
+    def masked_undeclared(self) -> list[tuple[str, str, Port]]:
+        """Undeclared flows that would exist without exclusions."""
+        if self.policy is None:
+            return []
+        return [
+            (s, d, p)
+            for s, row in self.matrix.items()
+            for d, c in row.items()
+            for p in c.excluded_ports
+            if decide(self.policy, self.inv[s], self.inv[d], p) is None
+        ]
+
     def pair_status(self, matrix: Matrix) -> dict[tuple[str, str], str]:
         """Worst policy status of the OPEN flows of each (source, target) pair; empty without a policy."""
         if self.policy is None:
@@ -345,10 +381,20 @@ def analyze(
     matrix, unknown, pn_count = build_matrix(inv, effective_scans, force_pn)
     # EXCLUDED verdict: pairs that had observations but now classify as NODATA
     if automations:
+        raw_matrix, _, _ = build_matrix(inv, scans, force_pn)
         for s, row in matrix.items():
+            raw_row = raw_matrix.get(s, {})
             for d, c in row.items():
+                raw = raw_row.get(d)
+                if raw is None:
+                    continue
                 if c.verdict <= NODATA and (s, d) in had_obs:
                     c.verdict = EXCLUDED
+                ep = sorted(set(raw.open_ports) - set(c.open_ports))
+                if ep:
+                    c.excluded_ports = ep
+                if raw.verdict != c.verdict:
+                    c.was = raw.verdict
     return Analysis(
         inv=inv,
         scans=effective_scans,

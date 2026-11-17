@@ -597,6 +597,178 @@ def test_exclusion_removes_findings(tmp_path):
     assert len(a1.findings) == 0
 
 
+def test_excluded_ports_and_was_on_cell():
+    """When an open port is excluded, the Cell records excluded_ports and was (pre-exclusion verdict)."""
+    from segowl.analysis import analyze
+    from segowl.verdict import OPEN
+
+    inv = load_inventory(str(MISSION / "inventory.csv"))
+    scans = {
+        "172.31.250.1": [
+            Scan(
+                path="x.xml",
+                source="172.31.250.1",
+                hosts={
+                    "172.31.250.10": HostRecord(state="up", ports=[(22, "tcp", "open"), (80, "tcp", "open")]),
+                },
+            )
+        ]
+    }
+    autos = [Automation("drop-80", "exclude", "port = 80 and state = open")]
+    a = analyze(inv, scans, [], automations=autos, force_pn=True)
+    c = a.matrix["172.31.250.1"]["172.31.250.10"]
+    assert c.verdict == OPEN
+    assert c.excluded_ports == [(80, "tcp")]
+    assert c.was is None  # verdict didn't change
+
+
+def test_excluded_ports_verdict_changes():
+    """When all open ports are excluded, verdict becomes EXCLUDED and was records the original."""
+    from segowl.analysis import analyze
+    from segowl.verdict import EXCLUDED, OPEN
+
+    inv = load_inventory(str(MISSION / "inventory.csv"))
+    scans = {
+        "172.31.250.1": [
+            Scan(
+                path="x.xml",
+                source="172.31.250.1",
+                hosts={
+                    "172.31.250.10": HostRecord(state="up", ports=[(80, "tcp", "open")]),
+                },
+            )
+        ]
+    }
+    autos = [Automation("all", "exclude", "port = 80")]
+    a = analyze(inv, scans, [], automations=autos, force_pn=True)
+    c = a.matrix["172.31.250.1"]["172.31.250.10"]
+    assert c.verdict == EXCLUDED
+    assert c.excluded_ports == [(80, "tcp")]
+    assert c.was == OPEN
+
+
+def test_closed_exclusion_reach_to_excluded():
+    """Excluding closed ports on a REACHABLE pair: verdict drops to EXCLUDED, was = REACH."""
+    from segowl.analysis import analyze
+    from segowl.verdict import EXCLUDED, REACH
+
+    inv = load_inventory(str(MISSION / "inventory.csv"))
+    scans = {
+        "172.31.250.1": [
+            Scan(
+                path="x.xml",
+                source="172.31.250.1",
+                hosts={
+                    "172.31.250.10": HostRecord(state="up", ports=[(22, "tcp", "closed")]),
+                },
+            )
+        ]
+    }
+    autos = [Automation("noise", "exclude", "state = closed")]
+    a = analyze(inv, scans, [], automations=autos, force_pn=True)
+    c = a.matrix["172.31.250.1"]["172.31.250.10"]
+    assert c.verdict == EXCLUDED
+    assert c.was == REACH
+
+
+def test_xp_marker_in_report(tmp_path):
+    """Excluded ports render with the .xp marker class in the report HTML."""
+    from segowl.analysis import analyze
+    from segowl.render.html import write_html
+
+    inv = load_inventory(str(MISSION / "inventory.csv"))
+    scans = {
+        "172.31.250.1": [
+            Scan(
+                path="x.xml",
+                source="172.31.250.1",
+                hosts={
+                    "172.31.250.10": HostRecord(
+                        state="up",
+                        ports=[(22, "tcp", "open"), (80, "tcp", "open")],
+                    ),
+                },
+            )
+        ]
+    }
+    autos = [Automation("drop-80", "exclude", "port = 80 and state = open")]
+    a = analyze(inv, scans, [], automations=autos, force_pn=True)
+    doc = open(write_html(a, str(tmp_path)), encoding="utf-8").read()
+    assert '<span class="xp">80</span>' in doc
+
+
+def test_no_xp_marker_without_automations(tmp_path):
+    """Without automations, no .xp marker appears in the report."""
+    from segowl.analysis import analyze
+    from segowl.render.html import write_html
+
+    inv = load_inventory(str(MISSION / "inventory.csv"))
+    scans = {
+        "172.31.250.1": [
+            Scan(
+                path="x.xml",
+                source="172.31.250.1",
+                hosts={
+                    "172.31.250.10": HostRecord(state="up", ports=[(80, "tcp", "open")]),
+                },
+            )
+        ]
+    }
+    a = analyze(inv, scans, [])
+    doc = open(write_html(a, str(tmp_path)), encoding="utf-8").read()
+    assert '<span class="xp">' not in doc
+
+
+def test_masked_finding_in_report(tmp_path):
+    """An excluded Finding appears as a masked row (.xrow) in the report."""
+    from segowl.analysis import analyze
+    from segowl.policy import load_policy
+    from segowl.render.html import write_html
+
+    inv = load_inventory(str(MISSION / "inventory.csv"))
+    scans = {
+        "172.31.250.1": [
+            Scan(
+                path="x.xml",
+                source="172.31.250.1",
+                hosts={
+                    "172.31.250.10": HostRecord(state="up", ports=[(22, "tcp", "open")]),
+                },
+            )
+        ]
+    }
+    policy = load_policy("policy.csv", inv, {}, text="audit;dmz;22;deny;no ssh\n")
+    autos = [Automation("no-ssh", "exclude", "port = 22 and state = open")]
+    a = analyze(inv, scans, [], automations=autos, policy=policy, force_pn=True)
+    assert len(a.findings) == 0
+    assert len(a.masked_findings) == 1
+    doc = open(write_html(a, str(tmp_path)), encoding="utf-8").read()
+    assert "no ssh" in doc.split('class="xrow"')[1][:200]
+
+
+def test_zone_matrix_excluded_verdict():
+    """A zone pair where all pairs are EXCLUDED shows EXCLUDED, not UNSEEN."""
+    from segowl.analysis import analyze
+    from segowl.verdict import EXCLUDED
+
+    inv = load_inventory(str(MISSION / "inventory.csv"))
+    scans = {
+        "172.31.250.1": [
+            Scan(
+                path="x.xml",
+                source="172.31.250.1",
+                hosts={
+                    "172.31.250.10": HostRecord(state="up", ports=[(80, "tcp", "open")]),
+                },
+            )
+        ]
+    }
+    autos = [Automation("all", "exclude", "port = 80")]
+    a = analyze(inv, scans, [], automations=autos, force_pn=True)
+    assert a.agg[("audit", "dmz")].verdict == EXCLUDED
+    assert (80, "tcp") in a.agg[("audit", "dmz")].excluded_ports
+
+
 # ---------------------------------------------------------------- app: Automations CRUD
 
 

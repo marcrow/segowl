@@ -93,13 +93,22 @@ def _pg(st: str | None) -> str:
     return f'<i class="pg pg-{st}" title="{FLOW[st][1]}">{FLOW[st][0]}</i>' if st else ""
 
 
+def _excl_mark(c: Cell, highlight: Highlight = _no_highlight) -> str:
+    """Greyed excluded ports, hidden by default, shown when body.show-excluded."""
+    if not c.excluded_ports and c.was is None:
+        return ""
+    was = f'<small class="xwas">{VERDICT_NAME.get(c.was, "")}</small> ' if c.was is not None else ""
+    ports = _ports_html(c.excluded_ports, highlight) if c.excluded_ports else ""
+    return f'<span class="xp">{was}{ports}</span>'
+
+
 def _cell_html(c: Cell, highlight: Highlight = _no_highlight, st: str | None = None) -> str:
     """A matrix tile: tinted by the Flow Policy (with its icon), the verdict as a dot (CSS), the ports."""
     cls = VCLASS[c.verdict] + (" conflict" if c.conflicts else "") + (f" p-{st}" if st else "")
     txt = _ports_html(c.open_ports, highlight) if c.verdict == OPEN else MARK.get(c.verdict, "")
     return (
         f'<td class="{cls}"{_ports_attr(c.open_ports, highlight)} title="{_provenance(c)}">'
-        f'{_pg(st)}<span class="pl">{txt}</span></td>'
+        f'{_pg(st)}<span class="pl">{txt}</span>{_excl_mark(c, highlight)}</td>'
     )
 
 
@@ -173,10 +182,12 @@ def _zone_matrix_html(
                 if a.verdict >= ALIVE
                 else ""
             )
+            xp = sorted(a.excluded_ports - a.open_ports)
+            xmark = f'<span class="xp">{_ports_html(xp, highlight)}</span>' if xp else ""
             cells.append(
                 f'<td class="{VCLASS[a.verdict]}{f" p-{st}" if st else ""}"'
                 f'{_ports_attr(a.open_ports, highlight)} data-cap="6">'
-                f'{_pg(st)}<span class="pl">{txt}</span>{pairs}</td>'
+                f'{_pg(st)}<span class="pl">{txt}</span>{xmark}{pairs}</td>'
             )
         rows.append(f"<tr><th>{_zone_chip(zs, pal)}</th>{''.join(cells)}</tr>")
     return (
@@ -268,7 +279,9 @@ def _source_table_html(src: str, a: Analysis) -> str:
             + f"{html.escape(inv[d].short)}</th>"
             f"<td>{html.escape(inv[d].zone)}</td><td>{html.escape(inv[d].htype)}</td>"
             f"<td>{_vb(c.verdict)}</td>"
-            f"<td{_ports_attr(c.open_ports, a.highlight)}>{_ports_html(c.open_ports, a.highlight)}</td>"
+            f"<td{_ports_attr(c.open_ports, a.highlight)}>"
+            f'<span class="pl">{_ports_html(c.open_ports, a.highlight)}</span>'
+            f"{_excl_mark(c, a.highlight)}</td>"
             f"<td>{_tested_html(c)}</td>"
             f"<td>{', '.join(_scan_name(s) for s in c.scans)}</td>"
             + "".join(
@@ -702,7 +715,7 @@ def _flow_row(a: Analysis, s: str, d: str, c: Cell, st: dict) -> str:
     return (
         f"<td>{_vb(c.verdict)}</td>"
         f"<td{_ports_attr(c.open_ports, a.highlight)}>{_pg(st.get((s, d)))}"
-        f'<span class="pl">{_ports_html(c.open_ports, a.highlight)}</span></td>'
+        f'<span class="pl">{_ports_html(c.open_ports, a.highlight)}</span>{_excl_mark(c, a.highlight)}</td>'
     )
 
 
@@ -757,12 +770,23 @@ def _pertarget_tab(a: Analysis) -> str:
         for s in a.sources
         if (c := a.matrix[s].get(d)) is not None and c.verdict >= ALIVE
     )
+    xrows = "".join(
+        f'<tr class="xrow"><th>{e(inv[d].short)}</th><td>{e(inv[d].zone)}</td>'
+        f"<td>{e(inv[s].short)}</td><td>{e(inv[s].zone)}</td>"
+        f"{_flow_row(a, s, d, c, st)}<td></td></tr>"
+        for d in ordered_ips(inv)
+        for s in a.sources
+        if (c := a.matrix[s].get(d)) is not None
+        and c.was is not None
+        and c.was >= ALIVE
+        and c.verdict < ALIVE
+    )
     overview = (
         '<details class="sec"><summary><b>All targets</b> · every target a Source reaches, one row per '
         "target × Source</summary>"
         '<div class="tablewrap"><table class="fit"><thead><tr><th>target</th><th>zone</th>'
         "<th>source</th><th>src zone</th><th>verdict</th><th>open ports</th><th>Flow Policy</th></tr></thead>"
-        f"<tbody>{allrows}</tbody></table></div></details>"
+        f"<tbody>{allrows}{xrows}</tbody></table></div></details>"
     )
     return (
         overview + '<label class="pick">Machine <input id="tgtq" type="search" list="tgtlist" '
@@ -1092,11 +1116,14 @@ def _diff_tab(a: Analysis) -> str:
     )
 
 
-def _flows_table(rows: list[list[str]], head: list[str]) -> str:
+def _flows_table(rows: list[list[str]], head: list[str], masked: list[list[str]] | None = None) -> str:
     body = "".join("<tr>" + "".join(f"<td>{c}</td>" for c in r) + "</tr>" for r in rows)
+    xbody = "".join(
+        '<tr class="xrow">' + "".join(f"<td>{c}</td>" for c in r) + "</tr>" for r in (masked or [])
+    )
     return (
         f'<div class="tablewrap"><table><thead><tr>{"".join(f"<th>{h}</th>" for h in head)}'
-        f"</tr></thead><tbody>{body or '<tr><td>None.</td></tr>'}</tbody></table></div>"
+        f"</tr></thead><tbody>{body or '<tr><td>None.</td></tr>'}{xbody}</tbody></table></div>"
     )
 
 
@@ -1118,7 +1145,11 @@ def _policy_tab(a: Analysis) -> str:
         return inv[t[0]].zone, inv[t[1]].zone, t
 
     findings = [flow(s, d, p) + [e(str(r)), e(r.comment)] for s, d, p, r in sorted(a.findings, key=zkey)]
+    masked_f = [
+        flow(s, d, p) + [e(str(r)), e(r.comment)] for s, d, p, r in sorted(a.masked_findings, key=zkey)
+    ]
     undeclared = [flow(s, d, p) for s, d, p in sorted(a.undeclared, key=zkey)]
+    masked_u = [flow(s, d, p) for s, d, p in sorted(a.masked_undeclared, key=zkey)]
     rules = [
         [str(r.line), e(r.src), e(r.dst), e(r.ports_spec), r.action, e(r.comment), str(hits[r.line])]
         + ([] if hits[r.line] else ['<span class="warn">never matched</span>'])
@@ -1145,9 +1176,9 @@ def _policy_tab(a: Analysis) -> str:
         "undeclared, never a Finding.</p>"
         + _sec(
             '<span id="pf">Findings: OPEN flows explicitly denied</span>',
-            _flows_table(findings, side + ["rule", "comment"]),
+            _flows_table(findings, side + ["rule", "comment"], masked_f),
         )
-        + _sec('<span id="pu">Undeclared flows</span>', _flows_table(undeclared, side))
+        + _sec('<span id="pu">Undeclared flows</span>', _flows_table(undeclared, side, masked_u))
         + _sec(
             '<span id="pr">Rules</span>',
             _flows_table(rules, ["line", "src", "dst", "ports", "action", "comment", "flows decided", ""]),
