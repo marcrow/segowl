@@ -59,14 +59,24 @@ function load(i) { // i = -1: a new profile, not in the kit yet
   saved = i >= 0 ? D.profiles[i] : {name: uniq("new-profile"), ports: "", options: NEW_OPTIONS, description: "", imported: 0, targeting: {}};
   P = {name: saved.name, ports: portList(saved.ports)}; o = parseOpts(saved.options);
   const t = saved.targeting || {};
-  tgt = {zones: [...(t.zones || [])], tags: [...(t.tags || [])], combine: t.combine || "or"};
+  const allZones = D.inventory_zones || [];
+  tgt = {zones: [...(t.zones && t.zones.length ? t.zones : allZones)], tags: [...(t.tags || [])], combine: t.combine || "and"};
   render(); renderTgt();
 }
-const draft = () => ({name: saved.name, ports: P.ports.join(","), options: optStr(o), targeting: (tgt.zones.length || tgt.tags.length) ? tgt : undefined});
+function tgtIsAll() {
+  const allZones = D.inventory_zones || [];
+  return !tgt.tags.length && tgt.zones.length === allZones.length && allZones.every(z => tgt.zones.includes(z));
+}
+const draft = () => ({name: saved.name, ports: P.ports.join(","), options: optStr(o), targeting: tgtIsAll() ? undefined : tgt});
+function savedTgtNorm() {
+  const st = saved.targeting || {};
+  const allZones = D.inventory_zones || [];
+  return {zones: st.zones && st.zones.length ? st.zones : allZones, tags: st.tags || [], combine: st.combine || "and"};
+}
 function changes() {
   const was = portList(saved.ports);
-  const st = saved.targeting || {};
-  const tgtChanged = JSON.stringify(tgt.zones) !== JSON.stringify(st.zones || []) || JSON.stringify(tgt.tags) !== JSON.stringify(st.tags || []) || tgt.combine !== (st.combine || "or");
+  const sn = savedTgtNorm();
+  const tgtChanged = JSON.stringify(tgt.zones.slice().sort()) !== JSON.stringify(sn.zones.slice().sort()) || JSON.stringify(tgt.tags.slice().sort()) !== JSON.stringify(sn.tags.slice().sort()) || tgt.combine !== sn.combine;
   return {add: P.ports.filter(x => !was.includes(x)), rem: was.filter(x => !P.ports.includes(x)), opts: optStr(o) !== optStr(parseOpts(saved.options)), tgt: tgtChanged};
 }
 const modified = () => { if (cur < 0) return true; const c = changes(); return !!(c.add.length || c.rem.length || c.opts || c.tgt); };
@@ -281,9 +291,8 @@ function tgtChanged() {
   updateTgtCount(); commit();
 }
 function updateTgtCount() {
-  const isAll = !tgt.zones.length && !tgt.tags.length;
   const badge = $("#tgt-badge");
-  badge.innerHTML = isAll ? `<span class="tgt-badge all">all</span>` : `<span class="tgt-badge filtered">filtered</span>`;
+  badge.innerHTML = tgtIsAll() ? `<span class="tgt-badge all">all</span>` : `<span class="tgt-badge filtered">filtered</span>`;
 }
 if ($("#tgt-combine")) $("#tgt-combine").onclick = e => {
   const btn = e.target.closest("button");
