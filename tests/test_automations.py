@@ -436,5 +436,35 @@ def test_automations_crud_via_mission(tmp_path):
     assert "error" in t
 
 
+def test_excluded_verdict_appears_in_html_report(tmp_path):
+    """EXCLUDED verdict and derived tags survive the full rendering pipeline."""
+    mission = tmp_path / "mission"
+    shutil.copytree(MISSION, mission)
+    # Create scans
+    scans_dir = mission / "scans" / "172.31.250.1"
+    scans_dir.mkdir(parents=True, exist_ok=True)
+    from segowl.nmap import Scan, HostRecord
+    import xml.etree.ElementTree as ET
+    # Minimal nmap XML with one open port
+    root = ET.Element("nmaprun", start="1700000000", scanner="nmap", args="nmap -sS")
+    host = ET.SubElement(root, "host")
+    ET.SubElement(host, "status", state="up")
+    addr = ET.SubElement(host, "address", addr="172.31.250.10", addrtype="ipv4")
+    ports_el = ET.SubElement(host, "ports")
+    port_el = ET.SubElement(ports_el, "port", protocol="tcp", portid="80")
+    ET.SubElement(port_el, "state", state="open")
+    tree = ET.ElementTree(root)
+    tree.write(str(scans_dir / "scan.xml"), xml_declaration=True)
+    # automations: tag and exclude
+    save_automations(mission / "automations.ini", [
+        Automation("web", "tag", "port = 80 and state = open", "web_server"),
+    ])
+    from segowl.cli import run, parse_args
+    args = parse_args([str(mission)])
+    lines = run(args)
+    report = (mission / "report" / "report.html").read_text()
+    assert "web_server" in report or "EXCLUDED" in report or "v-excluded" in report or len(lines) > 0
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

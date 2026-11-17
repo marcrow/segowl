@@ -102,6 +102,13 @@ def _cell_html(c: Cell, highlight: Highlight = _no_highlight, st: str | None = N
     )
 
 
+def _all_tags(h: Host, derived: dict[str, set[str]]) -> str:
+    """Manual tags + derived tags, comma-separated."""
+    manual = [t.strip() for t in h.extra.get("tags", "").split(",") if t.strip()]
+    auto = sorted(derived.get(h.machine, set()) - set(manual))
+    return ", ".join(manual + auto)
+
+
 def _host_title(h: Host) -> str:
     """Tooltip of an Interface: zone, type and free inventory columns."""
     return html.escape(
@@ -259,7 +266,10 @@ def _source_table_html(src: str, a: Analysis) -> str:
             f"<td{_ports_attr(c.open_ports, a.highlight)}>{_ports_html(c.open_ports, a.highlight)}</td>"
             f"<td>{_tested_html(c)}</td>"
             f"<td>{', '.join(_scan_name(s) for s in c.scans)}</td>"
-            + "".join(f"<td>{html.escape(inv[d].extra.get(k, ''))}</td>" for k in extras)
+            + "".join(
+                f"<td>{html.escape(_all_tags(inv[d], a.derived_tags) if k == 'tags' else inv[d].extra.get(k, ''))}</td>"
+                for k in extras
+            )
             + "</tr>"
         )
         if more:
@@ -1192,9 +1202,16 @@ def _group_filter(a: Analysis) -> str:
 def write_html(a: Analysis, out_dir: str) -> str:
     tabs = _tabs(a)
     n_scans = sum(len(v) for v in a.scans.values())
+    auto_meta = ""
+    if a.derived_tags:
+        n_tags = sum(len(v) for v in a.derived_tags.values())
+        auto_meta += f" · {n_tags} derived tag(s) from Automations"
+    if a.automation_warnings:
+        auto_meta += f' · <span class="warn">{html.escape(a.automation_warnings[0])}</span>'
     meta = (
         f"{len(a.inv)} targets · {len(a.sources)} Source(s) · {n_scans} Scan(s) · "
         f"{len(a.unknown)} host(s) outside the inventory · {len(a.orphan)} ignored Scan(s)"
+        + auto_meta
     )
     buttons = "".join(
         f'<a class="{"on" if i == 0 else ""}" data-tab="{key}" href="#{key}" '
