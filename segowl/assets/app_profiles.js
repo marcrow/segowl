@@ -51,23 +51,29 @@ function optStr(o) {
 const portList = s => s.split(",").map(x => x.trim()).filter(Boolean);
 
 let D = null, cur = 0, P = null, o = null, saved = null, mode = null, saving = false;
+let tgt = {zones: [], tags: [], combine: "or"};  // current targeting state
 const NEW_OPTIONS = "-sS -Pn -T4 --max-retries 2 -n --reason";
 const uniq = base => { let n = base, k = 2; while (D.profiles.some(p => p.name === n)) n = `${base}-${k++}`; return n; };
 function load(i) { // i = -1: a new profile, not in the kit yet
   cur = i; mode = null;
-  saved = i >= 0 ? D.profiles[i] : {name: uniq("new-profile"), ports: "", options: NEW_OPTIONS, description: "", imported: 0};
-  P = {name: saved.name, ports: portList(saved.ports)}; o = parseOpts(saved.options); render();
+  saved = i >= 0 ? D.profiles[i] : {name: uniq("new-profile"), ports: "", options: NEW_OPTIONS, description: "", imported: 0, targeting: {}};
+  P = {name: saved.name, ports: portList(saved.ports)}; o = parseOpts(saved.options);
+  const t = saved.targeting || {};
+  tgt = {zones: [...(t.zones || [])], tags: [...(t.tags || [])], combine: t.combine || "or"};
+  render(); renderTgt();
 }
-const draft = () => ({name: saved.name, ports: P.ports.join(","), options: optStr(o)});
+const draft = () => ({name: saved.name, ports: P.ports.join(","), options: optStr(o), targeting: (tgt.zones.length || tgt.tags.length) ? tgt : undefined});
 function changes() {
   const was = portList(saved.ports);
-  return {add: P.ports.filter(x => !was.includes(x)), rem: was.filter(x => !P.ports.includes(x)), opts: optStr(o) !== optStr(parseOpts(saved.options))};
+  const st = saved.targeting || {};
+  const tgtChanged = JSON.stringify(tgt.zones) !== JSON.stringify(st.zones || []) || JSON.stringify(tgt.tags) !== JSON.stringify(st.tags || []) || tgt.combine !== (st.combine || "or");
+  return {add: P.ports.filter(x => !was.includes(x)), rem: was.filter(x => !P.ports.includes(x)), opts: optStr(o) !== optStr(parseOpts(saved.options)), tgt: tgtChanged};
 }
-const modified = () => { if (cur < 0) return true; const c = changes(); return !!(c.add.length || c.rem.length || c.opts); };
+const modified = () => { if (cur < 0) return true; const c = changes(); return !!(c.add.length || c.rem.length || c.opts || c.tgt); };
 function commit() { drawMod(); preview(); }
 async function saveList(list, done) {
   if (saving) return; saving = true; status("Saving…");
-  try { const r = await api("/api/profiles", {fp: D.fp, profiles: list}); D = await api("/api/profiles"); status("Saved ✓", "ok"); done(); window.dispatchEvent(new Event("profiles-saved")); }
+  try { const r = await api("/api/profiles", {fp: D.fp, tfp: D.tfp, profiles: list}); D = await api("/api/profiles"); status("Saved ✓", "ok"); done(); window.dispatchEvent(new Event("profiles-saved")); }
   catch (e) { status(e.status === 409 ? "Modified elsewhere: reload" : "Not saved: " + e.message, "err"); }
   saving = false;
 }
@@ -79,7 +85,7 @@ function drawMod() {
   window.SegDraft = {name: cur >= 0 ? name : "", modified: mod}; window.dispatchEvent(new Event("draftchange"));
   $("#pf").disabled = mod; $("#pf").title = mod ? "Save or discard the changes first" : "";
   if (!mod) { $("#modbar").innerHTML = ""; return; }
-  const pills = cur < 0 ? `<b>New profile</b> <span class="small muted">not in the kit yet</span>` : `<b>Modified from ${esc(name)}</b> ${c.add.map(x => `<span class="pill" style="background:#e6f7ec">+ ${esc(x)}</span>`).join("")}${c.rem.map(x => `<span class="pill" style="background:#fde8e8;text-decoration:line-through">${esc(x)}</span>`).join("")}${c.opts ? `<span class="pill" style="background:#fff3d6">options: ${esc(optStr(o))}</span>` : ""}`;
+  const pills = cur < 0 ? `<b>New profile</b> <span class="small muted">not in the kit yet</span>` : `<b>Modified from ${esc(name)}</b> ${c.add.map(x => `<span class="pill" style="background:#e6f7ec">+ ${esc(x)}</span>`).join("")}${c.rem.map(x => `<span class="pill" style="background:#fde8e8;text-decoration:line-through">${esc(x)}</span>`).join("")}${c.opts ? `<span class="pill" style="background:#fff3d6">options: ${esc(optStr(o))}</span>` : ""}${c.tgt ? `<span class="pill" style="background:#d8f6ff">targeting</span>` : ""}`;
   const descr = cur < 0 ? "" : `Variant of ${name}: ${[...c.add.map(x => "+" + x), ...c.rem.map(x => "−" + x), ...(c.opts ? ["options changed"] : [])].join(" ")}`;
   const form = `<div class="toolbar" style="margin:6px 0 0"><input type="text" id="nv-name" value="${esc(cur < 0 ? name : uniq(name + "-v2"))}" style="width:170px" title="Profile name: letters, digits, . _ -">
     <input type="text" id="nv-desc" value="${esc(descr)}" placeholder="what it is for" style="flex:1;min-width:220px"><button class="btn sm pri" id="nv-ok">Save ${cur < 0 ? "the profile" : "the new version"}</button><button class="btn sm" data-mb="cancel">Cancel</button></div>`;
@@ -102,7 +108,8 @@ function drawMod() {
     const ok = () => {
       const n = $("#nv-name").value.trim();
       if (!/^[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(n) || D.profiles.some(p => p.name === n)) { $("#nv-name").style.borderColor = "#dc2626"; toast(`${n}: name taken or invalid (letters, digits, . _ -)`); return; }
-      saveList([...D.profiles, {...draft(), name: n, description: $("#nv-desc").value.trim()}], () => {
+      const d = draft();
+      saveList([...D.profiles, {...d, name: n, description: $("#nv-desc").value.trim()}], () => {
         toast(cur < 0 ? `${n} saved in the kit` : `Saved as ${n} in the kit; ${name} is unchanged`); load(D.profiles.findIndex(p => p.name === n));
       });
     };
@@ -113,12 +120,13 @@ function drawMod() {
 // ---------------------------------------------------------------- preview (server)
 const preview = debounce(async () => {
   if (!P) return;
-  const r = await api("/api/profiles/preview", {...draft(), src: $("#src").value}).catch(e => ({errors: [e.message], commands: [], warnings: []}));
+  const r = await api("/api/profiles/preview", {...draft(), targeting: (tgt.zones.length || tgt.tags.length) ? tgt : undefined, src: $("#src").value}).catch(e => ({errors: [e.message], commands: [], warnings: []}));
   $("#warns").innerHTML = r.errors.map(e => `<div class="err">${esc(e)}</div>`).join("") + r.warnings.map(w => `<div class="warn">${esc(w)}</div>`).join("");
   $("#cmd").innerHTML = r.commands.map((c, i) => `<div class="small muted" style="margin-top:6px">${r.commands.length > 1 ? `Scan ${i + 1}/${r.commands.length} · ` : ""}${esc(c.label)}${r.commands.length > 1 && i === 0 ? " — nmap would intersect --top-ports with -p, so they run separately; SegOWL merges both into the Source View" : ""}</div><pre class="cmd">${esc(c.cmd)}</pre>`).join("");
   const c = r.counts || {};
   $("#cnt").textContent = c.targets !== undefined ? `${c.top ? "top " + c.top + " + " : ""}${c.tcp} TCP · ${c.udp} UDP` : "";
-  $("#tcount").textContent = c.targets !== undefined ? `${c.targets} targets (inventory minus Self)` : "";
+  $("#tcount").textContent = c.targets !== undefined ? `${c.targets} targets${c.filtered ? " (filtered)" : " (inventory minus Self)"}` : "";
+  if ($("#tgt-count")) $("#tgt-count").innerHTML = c.filtered ? `<span class="n active">${c.machines}</span> Machines · <span class="n active">${c.targets}</span> Interfaces` : "";
   $("#udph").innerHTML = c.udp ? `-sU added automatically for the <b>${c.udp}</b> UDP port(s)` : `<span class="muted">no UDP port selected</span>`;
 }, 250);
 
@@ -245,6 +253,45 @@ function wire() {
     ...(q && !NSE.some(([n]) => n === q) ? [{f: q, h: "add this script name as typed"}] : [])], x => { if (!o.scripts.includes(x.f)) o.scripts.push(x.f); });
   $("#src").onchange = preview;
 }
+
+// ---------------------------------------------------------------- targeting (per-profile zone/tag filter)
+function renderTgt() {
+  if (!D) return;
+  const zones = D.inventory_zones || [], tags = D.inventory_tags || [], derived = new Set(D.derived_tags || []);
+  const zoneSet = new Set(tgt.zones), tagSet = new Set(tgt.tags);
+  const zc = ZONE_COLORS || [];
+  $("#tgt-zones").innerHTML = zones.map((z, i) => {
+    const c = zc[i % zc.length] || ["#eff8ff", "#1565c0", "#0b3c75"];
+    return `<label><input type="checkbox" data-zone="${esc(z)}" ${zoneSet.has(z) ? "checked" : ""}>` +
+      `<span class="zonechip" style="border-color:${c[1]};color:${c[2]};background:${c[0]}">${esc(z)}</span></label>`;
+  }).join(" ") || `<span class="small muted">no Zone in the inventory</span>`;
+  $("#tgt-tags").innerHTML = tags.map(t => {
+    const cls = derived.has(t) ? "pill auto" : "pill";
+    return `<label><input type="checkbox" data-tag="${esc(t)}" ${tagSet.has(t) ? "checked" : ""}><span class="${cls}">${esc(t)}</span></label>`;
+  }).join(" ") || `<span class="small muted">no tag in the inventory</span>`;
+  document.querySelectorAll("#tgt-combine button").forEach(b => b.classList.toggle("on", b.dataset.v === tgt.combine));
+  // event wiring
+  $("#tgt-zones").querySelectorAll("input").forEach(cb => cb.onchange = tgtChanged);
+  $("#tgt-tags").querySelectorAll("input").forEach(cb => cb.onchange = tgtChanged);
+  updateTgtCount();
+}
+function tgtChanged() {
+  tgt.zones = [...document.querySelectorAll("#tgt-zones input:checked")].map(cb => cb.dataset.zone);
+  tgt.tags = [...document.querySelectorAll("#tgt-tags input:checked")].map(cb => cb.dataset.tag);
+  updateTgtCount(); commit();
+}
+function updateTgtCount() {
+  const isAll = !tgt.zones.length && !tgt.tags.length;
+  const badge = $("#tgt-badge");
+  badge.innerHTML = isAll ? `<span class="tgt-badge all">all</span>` : `<span class="tgt-badge filtered">filtered</span>`;
+}
+if ($("#tgt-combine")) $("#tgt-combine").onclick = e => {
+  const btn = e.target.closest("button");
+  if (!btn) return;
+  document.querySelectorAll("#tgt-combine button").forEach(b => b.classList.toggle("on", b === btn));
+  tgt.combine = btn.dataset.v;
+  commit();
+};
 
 (async () => {
   try { D = await api("/api/profiles"); } catch (e) { status("Cannot load: " + e.message, "err"); return; }

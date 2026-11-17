@@ -179,6 +179,66 @@ def test_script_targets_skip_every_interface_of_the_source_machine(mission):
     )
 
 
+def test_script_targets_respect_profile_targeting(mission):
+    # add tags to the inventory
+    inv = mission.file("inventory.csv")
+    inv.write_text(
+        "ip;zone;type;name;owner;criticality;tags\n"
+        "172.31.250.1;audit;laptop;auditor;;;;\n"
+        "172.31.250.10;dmz;container;app-01;web-team;high;linux\n"
+        "172.31.250.20;data;container;db-01;dba;critical;linux,db\n"
+        "172.31.250.30;data;vm;ghost-01;;;windows\n"
+        "172.31.251.40;lab;vm;never-scanned;;;windows\n"
+    )
+    mission.save_profiles(
+        {
+            "fp": "",
+            "profiles": [
+                {"name": "all", "ports": "22", "options": "-sS -Pn"},
+                {
+                    "name": "data-only",
+                    "ports": "22",
+                    "options": "-sS -Pn",
+                    "targeting": {"zones": ["data"], "tags": [], "combine": "or"},
+                },
+                {
+                    "name": "win-and-data",
+                    "ports": "22",
+                    "options": "-sS -Pn",
+                    "targeting": {"zones": ["data"], "tags": ["windows"], "combine": "and"},
+                },
+                {
+                    "name": "win-or-lab",
+                    "ports": "22",
+                    "options": "-sS -Pn",
+                    "targeting": {"zones": ["lab"], "tags": ["windows"], "combine": "or"},
+                },
+            ],
+        }
+    )
+    # "all": no targeting → all minus Self
+    script_all = mission.script("172.31.250.1", "all")
+    assert "172.31.250.10" in script_all and "172.31.250.20" in script_all
+    assert "172.31.250.30" in script_all and "172.31.251.40" in script_all
+    # "data-only": only zone=data
+    script_data = mission.script("172.31.250.1", "data-only")
+    assert "172.31.250.20" in script_data and "172.31.250.30" in script_data
+    assert "172.31.250.10" not in script_data and "172.31.251.40" not in script_data
+    # "win-and-data": zone=data AND tag=windows → only ghost-01
+    script_and = mission.script("172.31.250.1", "win-and-data")
+    assert "172.31.250.30" in script_and
+    assert "172.31.250.20" not in script_and and "172.31.251.40" not in script_and
+    # "win-or-lab": zone=lab OR tag=windows → ghost-01, never-scanned
+    script_or = mission.script("172.31.250.1", "win-or-lab")
+    assert "172.31.250.30" in script_or and "172.31.251.40" in script_or
+    assert "172.31.250.10" not in script_or and "172.31.250.20" not in script_or
+    # targeting persists: reload and check
+    tgt = mission._read_targeting()
+    assert tgt["data-only"]["zones"] == ["data"]
+    assert tgt["win-and-data"]["combine"] == "and"
+    assert "all" not in tgt  # no targeting = not stored
+
+
 def test_uploaded_scan_completes_its_profile_and_feeds_the_report(mission, tmp_path):
     mission.save_profiles({"fp": "", "profiles": [{"name": "late", "ports": "22", "options": "-sT -Pn"}]})
     xml = next((MISSION / "scans" / "172.31.250.1").glob("*.xml")).read_bytes()

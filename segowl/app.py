@@ -7,6 +7,7 @@ the report is regenerated from it whenever its files change, whoever changed the
 from __future__ import annotations
 
 import argparse
+import csv as _csv
 import getpass
 import hashlib
 import hmac
@@ -401,15 +402,26 @@ class Mission:
         return sets, specs
 
     def profiles(self) -> dict:
+        tgt = self._read_targeting()
+        rows = self.rows()
+        zones = sorted({r.get("zone", "") for r in rows if r.get("zone")})
+        manual_tags = {t.strip() for r in rows for t in (r.get("tags") or "").split(",") if t.strip()}
+        dt = self._derived_tags()
+        derived_tags = {t for ts in dt.values() for t in ts}
+        all_tags = sorted(manual_tags | derived_tags)
         return {
             "fp": fingerprint(self.file("scan_profiles.csv")),
+            "tfp": fingerprint(self.file("scan_targeting.csv")),
             "profiles": [
-                {**vars(p), "imported": self.imported(p)}
+                {**vars(p), "imported": self.imported(p), "targeting": tgt.get(p.name, {})}
                 for p in sp.read_profiles(self.text("scan_profiles.csv"))
             ],
             "groups": self.groups()[1],
             "denied": sp.DENIED,
             "sources": self.source_ips() or [r["ip"] for r in self.rows()[:1]],
+            "inventory_zones": zones,
+            "inventory_tags": all_tags,
+            "derived_tags": sorted(derived_tags),
         }
 
     def imported(self, p: sp.Profile) -> int:
@@ -435,7 +447,27 @@ class Mission:
         if errors:
             raise ValueError("; ".join(errors))
         text = mf.with_notes(sp.profiles_text(profiles), self.text("scan_profiles.csv"))
-        return save_file(self.file("scan_profiles.csv"), text, data.get("fp", ""))
+        prof_file = self.file("scan_profiles.csv")
+        tgt_file = self.file("scan_targeting.csv")
+        has_targeting = any("targeting" in p for p in data.get("profiles", []))
+        if has_targeting:
+            targeting = {}
+            for p in data.get("profiles", []):
+                t = p.get("targeting") or {}
+                if t.get("zones") or t.get("tags"):
+                    targeting[str(p.get("name", "")).strip()] = t
+            tgt_text = self._targeting_text(targeting)
+        else:
+            tgt_text = None
+        with LOCK:
+            fps = {prof_file: data.get("fp", "")}
+            if has_targeting:
+                fps[tgt_file] = data.get("tfp", "")
+            check_fingerprints(fps)
+            write_file(prof_file, text)
+            if tgt_text is not None:
+                write_file(tgt_file, tgt_text or None)
+        return fingerprint(prof_file)
 
     def preview(self, data: dict) -> dict:
         p = sp.Profile(
@@ -446,7 +478,14 @@ class Mission:
         src = str(data.get("src") or "")
         if errors:
             return {"errors": errors, "commands": [], "counts": {}, "warnings": []}
-        targets = self.targets(src)
+        t = data.get("targeting") or {}
+        zones = t.get("zones") or None
+        tags = t.get("tags") or None
+        combine = t.get("combine", "or")
+        targets = self.targets(src, zones, tags, combine)
+        rows = self.rows()
+        ip_to_machine = {r["ip"]: r.get("name") or r["ip"] for r in rows}
+        machines = len({ip_to_machine.get(ip, ip) for ip in targets})
         cmds = sp.commands(p, sets, f"scans/{src or '<source>'}", f"targets/{src or '<source>'}-{p.name}.txt")
         c = sp.counts(p, sets)
         warnings = []
@@ -454,6 +493,8 @@ class Mission:
             warnings.append(
                 "Without -Pn, hosts that drop discovery are reported BLOCKED and never port-scanned."
             )
+        if (zones or tags) and not targets:
+            warnings.append("Targeting yields 0 targets for this Source: check the zone/tag selection.")
         if c["udp"] > 50:
             warnings.append(
                 f"{c['udp']} UDP ports × {len(targets)} targets: expect hours. Keep UDP to a short list."
@@ -463,7 +504,12 @@ class Mission:
             "commands": [
                 {"label": label, "cmd": " ".join(shlex.quote(a) for a in argv)} for label, _, argv in cmds
             ],
-            "counts": {**c, "targets": len(targets)},
+            "counts": {
+                **c,
+                "targets": len(targets),
+                "machines": machines,
+                "filtered": bool(zones or tags),
+            },
             "warnings": warnings,
         }
 
@@ -739,11 +785,85 @@ class Mission:
         scans = self.file("scans")
         return sorted(d.name for d in scans.iterdir() if d.is_dir()) if scans.is_dir() else []
 
-    def targets(self, src: str) -> list[str]:
-        """Every inventory Interface minus the Source's own Machine (Self)."""
+    def _read_targeting(self) -> dict[str, dict]:
+        """Per-profile targeting from scan_targeting.csv: {profile: {zones, tags, combine}}."""
+        out: dict[str, dict] = {}
+        first = True
+        for _, row in mf.csvfile.rows(self.text("scan_targeting.csv")):
+            if first:
+                first = False
+                continue
+            name = row[0]
+            zones = [z.strip() for z in (row[1] if len(row) > 1 else "").split(",") if z.strip()]
+            tags = [t.strip() for t in (row[2] if len(row) > 2 else "").split(",") if t.strip()]
+            combine = (row[3] if len(row) > 3 else "or").strip().lower()
+            if combine not in ("and", "or"):
+                combine = "or"
+            out[name] = {"zones": zones, "tags": tags, "combine": combine}
+        return out
+
+    @staticmethod
+    def _targeting_text(targeting: dict[str, dict]) -> str:
+        rows = [("profile", "zones", "tags", "combine")]
+        for name, t in targeting.items():
+            if t.get("zones") or t.get("tags"):
+                rows.append(
+                    (
+                        name,
+                        ",".join(t.get("zones", [])),
+                        ",".join(t.get("tags", [])),
+                        t.get("combine", "or"),
+                    )
+                )
+        if len(rows) < 2:
+            return ""
+        buf = io.StringIO()
+        w = _csv.writer(buf, delimiter=";", lineterminator="\n")
+        w.writerows(rows)
+        return buf.getvalue()
+
+    def _effective_tags(self, rows: list[dict]) -> dict[str, set[str]]:
+        """Machine name -> all tags (manual + derived)."""
+        manual: dict[str, set[str]] = {}
+        for r in rows:
+            m = r.get("name") or r["ip"]
+            tags = [t.strip() for t in (r.get("tags") or "").split(",") if t.strip()]
+            manual.setdefault(m, set()).update(tags)
+        dt = self._derived_tags()
+        for m, tags in dt.items():
+            manual.setdefault(m, set()).update(tags)
+        return manual
+
+    def targets(
+        self,
+        src: str,
+        zones: list[str] | None = None,
+        tags: list[str] | None = None,
+        combine: str = "or",
+    ) -> list[str]:
+        """Inventory Interfaces minus Self, optionally filtered by Zones and/or Machine Tags."""
         rows = self.rows()
         machine = next((r.get("name") or r["ip"] for r in rows if r["ip"] == src), src)
-        return [r["ip"] for r in rows if (r.get("name") or r["ip"]) != machine]
+        candidates = [r for r in rows if (r.get("name") or r["ip"]) != machine]
+        if not zones and not tags:
+            return [r["ip"] for r in candidates]
+        zone_set = set(zones) if zones else None
+        tag_set = set(tags) if tags else None
+        effective = self._effective_tags(rows) if tag_set else {}
+        result = []
+        for r in candidates:
+            m = r.get("name") or r["ip"]
+            in_zone = zone_set is None or r.get("zone", "") in zone_set
+            has_tag = tag_set is None or bool(effective.get(m, set()) & tag_set)
+            if zone_set is None:
+                ok = has_tag
+            elif tag_set is None:
+                ok = in_zone
+            else:
+                ok = (in_zone and has_tag) if combine == "and" else (in_zone or has_tag)
+            if ok:
+                result.append(r["ip"])
+        return result
 
     def scans(self) -> dict:
         rows = {r["ip"]: r for r in self.rows()}
@@ -853,6 +973,13 @@ class Mission:
         dest.parent.mkdir(exist_ok=True)
         os.replace(f, dest)
 
+    def _profile_targeting(self, profile: str) -> tuple[list[str] | None, list[str] | None, str]:
+        """The saved targeting for a profile, as (zones, tags, combine)."""
+        t = self._read_targeting().get(profile, {})
+        zones = t.get("zones") or None
+        tags = t.get("tags") or None
+        return zones, tags, t.get("combine", "or")
+
     def script(self, src: str, profile: str) -> str:
         p = next((p for p in sp.read_profiles(self.text("scan_profiles.csv")) if p.name == profile), None)
         if p is None:
@@ -860,12 +987,18 @@ class Mission:
         self.source_dir(src)
         r = next((r for r in self.rows() if r["ip"] == src), {})
         label = f"{src} ({r['name']})" if r.get("name") else src
-        return sp.script(p, self.groups()[0], self.path.name, src, label, self.targets(src))
+        zones, tags, combine = self._profile_targeting(profile)
+        tgts = self.targets(src, zones, tags, combine)
+        return sp.script(p, self.groups()[0], self.path.name, src, label, tgts)
 
     def scripts_zip(self, profile: str) -> bytes:
+        zones, tags, combine = self._profile_targeting(profile)
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
             for src in self.source_ips():
+                targets = self.targets(src, zones, tags, combine)
+                if not targets:
+                    continue
                 info = zipfile.ZipInfo(f"segowl-{src}-{profile}.sh")
                 info.external_attr = 0o755 << 16
                 zf.writestr(info, self.script(src, profile))

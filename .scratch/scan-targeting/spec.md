@@ -12,7 +12,7 @@ Non-goals: target selection from scan results (that's Automations + tags).
 
 ## Constraints
 
-- Targeting is **per Scan Profile**, persisted in `scan_profiles.csv` (3 new columns: `zones`, `tags`, `combine`). Empty = whole inventory (backward-compatible default).
+- Targeting is **per Scan Profile**, persisted in a separate `scan_targeting.csv` (columns: `profile`, `zones`, `tags`, `combine`). Empty = whole inventory (backward-compatible default). Stored separately to preserve kit portability (zones are client data).
 - Filter expression: flat list of criteria (Zone and/or Machine Tag), with a global AND/OR toggle.
   - AND: `zone = iLO AND tag = windows` → intersection (Machines in iLO that are tagged windows).
   - OR: `zone = iLO OR tag = admin` → union.

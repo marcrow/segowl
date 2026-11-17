@@ -1,6 +1,6 @@
 # Prototype: target filter in script generation
 
-Status: prototype-ready
+Status: done
 Blocked by: –
 Spec: ../spec.md
 Type: prototype

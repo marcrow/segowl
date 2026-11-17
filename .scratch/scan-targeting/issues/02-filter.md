@@ -1,13 +1,13 @@
 # Per-profile targeting: persistence and backend
 
-Status: ready-for-agent
-Blocked by: 01
+Status: done
+Blocked by: –
 Spec: ../spec.md
 Type: task
 
 ## What
 
-- `scan_profiles.csv` gains 3 optional columns: `zones`, `tags`, `combine`. Empty = whole inventory (backward-compatible).
+- Targeting stored in separate `scan_targeting.csv` (columns: `profile`, `zones`, `tags`, `combine`). Empty = whole inventory (backward-compatible). Separate file preserves kit portability (zones are client data).
 - `Mission.targets(src, zones=None, tags=None, combine='or')` → filtered IP list.
 - `zones`: list of Zone names; `tags`: list of Machine Tags; `combine`: 'and' or 'or'.
 - When both are set and combine='and': only Machines in a listed Zone AND having a listed tag.

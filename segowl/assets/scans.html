@@ -7,8 +7,8 @@ and drop the results on its row.</p>
   <span class="small muted">from a profile of the kit · <a href="/kit/profiles">all profiles</a></span>
   <span style="margin-left:auto"></span><span class="status" id="st">Loading…</span></div>
 <p class="sub" style="margin-top:6px">The command line is the whole profile: type in it to add ports, top ports, options
-or NSE scripts, ✕ to remove; it stays in sync with the panels below. Targets always come from the inventory; the
-commands are computed for the Source you pick. Changes stay a draft until you save them.</p>
+or NSE scripts, ✕ to remove; it stays in sync with the panels below. Targets come from the inventory, narrowed by the
+Targeting section below; the commands are computed for the Source you pick. Changes stay a draft until you save them.</p>
 <div class="toolbar"><select id="pf"></select><span class="small" id="pdesc" style="max-width:720px"></span></div>
 <div id="modbar"></div>
 <div class="palette" style="margin-bottom:14px"><div class="tokenline" id="tl"></div><div class="drop" id="pd" hidden></div></div>
@@ -47,6 +47,23 @@ commands are computed for the Source you pick. Changes stay a draft until you sa
     <div class="small" style="margin-top:8px"><b>Commands for Source</b> <select id="src"></select> <span class="muted" id="tcount"></span></div>
     <div id="cmd"></div>
   </div>
+</div>
+<!-- Targeting: per-profile zone/tag filter, saved with the profile -->
+<div class="tgt" id="tgt">
+  <div class="tgt-head">
+    <b>Targeting</b>
+    <span class="small muted">which Machines this profile scans — saved with the profile</span>
+    <span id="tgt-badge"></span>
+  </div>
+  <div class="tgt-row"><span class="lbl">Zones</span><div class="tgt-checks" id="tgt-zones"></div></div>
+  <div class="tgt-combine">
+    <span class="seg" id="tgt-combine" title="How Zones and Tags combine: OR includes a Machine that matches either; AND requires both a Zone and a Tag to match">
+      <button data-v="or">OR</button><button data-v="and">AND</button>
+    </span>
+    <span class="small muted tgt-combine-hint">between Zones and Tags</span>
+  </div>
+  <div class="tgt-row"><span class="lbl">Tags</span><div class="tgt-checks" id="tgt-tags"></div></div>
+  <div class="tgt-count" id="tgt-count"></div>
 </div>
 </div>
 <div class="card"><div class="stephead"><span class="stepn">2</span><b>Run it from each Source</b>
