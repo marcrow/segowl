@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import html
 import json
+import os
 import re
 from collections import Counter, defaultdict
 from collections.abc import Callable, Iterable
@@ -212,7 +213,7 @@ def _port_detail(src: str, d: str, a: Analysis, labels: Labels) -> str:
     scans = [(sc.name, a.scan_row(sc).get(d)) for sc in a.scans[src]]
     conf = a.matrix[src][d].conflicts
     ports = sorted({p for _, c in scans if c for p in c.open_ports} | set(conf))
-    head = "".join(f"<th>{html.escape(n)}</th>" for n, _ in scans)
+    head = "".join(f"<th>{_scan_name(n)}</th>" for n, _ in scans)
     rows = []
     for p in ports:
         cells = []
@@ -257,7 +258,7 @@ def _source_table_html(src: str, a: Analysis) -> str:
             f"<td>{_vb(c.verdict)}</td>"
             f"<td{_ports_attr(c.open_ports, a.highlight)}>{_ports_html(c.open_ports, a.highlight)}</td>"
             f"<td>{_tested_html(c)}</td>"
-            f"<td>{html.escape(', '.join(c.scans))}</td>"
+            f"<td>{', '.join(_scan_name(s) for s in c.scans)}</td>"
             + "".join(f"<td>{html.escape(inv[d].extra.get(k, ''))}</td>" for k in extras)
             + "</tr>"
         )
@@ -272,9 +273,25 @@ def _source_table_html(src: str, a: Analysis) -> str:
     )
 
 
+VERDICT_TIP = {
+    OPEN: "At least one open port: a service is reachable",
+    REACH: "No open port but a closed port answered (RST): L4 flow crosses",
+    ALIVE: "Answers ping/ARP but no port gets through — scan deeper",
+    BLOCK: "No answer to discovery, or only filtered ports",
+    NODATA: "This Interface was not in the Scan output",
+}
+
+
 def _vb(verdict: int) -> str:
     """Verdict badge in a table: one navy hue, darker = more open (red / amber / green: Flow Policy)."""
-    return f'<span class="vb {VCLASS[verdict]}">{VERDICT_NAME[verdict]}</span>'
+    tip = html.escape(VERDICT_TIP[verdict], quote=True)
+    return f'<span class="vb {VCLASS[verdict]}" title="{tip}">{VERDICT_NAME[verdict]}</span>'
+
+
+def _scan_name(name: str) -> str:
+    """Scan name with a data attribute for JS-activated links (app only, not standalone report)."""
+    stem = html.escape(os.path.splitext(name)[0], quote=True)
+    return f'<span class="scan-name" data-scan="{stem}">{html.escape(name)}</span>'
 
 
 def _line(col: str, dash: bool = False, width: float = 2.5) -> str:
@@ -864,7 +881,7 @@ def _scans_tab(a: Analysis) -> str:
                 )
             rows.append(
                 f"<tr><th>{html.escape(h.short)}</th><td>{html.escape(h.zone)}</td>"
-                f"<td>{html.escape(sc.name)}</td><td>{html.escape(sc.started)}</td>"
+                f"<td>{_scan_name(sc.name)}</td><td>{html.escape(sc.started)}</td>"
                 f"<td>{cov}</td><td>{len(sc.hosts)}</td>"
                 f'<td class="{"warn" if conflicts[sc.name] else ""}">{conflicts[sc.name] or ""}</td>'
                 f'<td class="cmd"><code>{html.escape(sc.command)}</code></td></tr>'

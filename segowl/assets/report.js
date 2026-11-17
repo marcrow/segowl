@@ -107,7 +107,14 @@ function toggleMore(tr){
   const m=tr.nextElementSibling; m.hidden=!m.hidden;
   const th=tr.querySelector('th'); th.textContent=(m.hidden?'▸ ':'▾ ')+th.textContent.slice(2);
 }
-window.addEventListener('DOMContentLoaded',()=>enhanceTables(document));
+window.addEventListener('DOMContentLoaded',()=>{
+  enhanceTables(document);
+  if(window.self!==window.top) document.querySelectorAll('.scan-name[data-scan]').forEach(sp=>{
+    const a=document.createElement('a'); a.href='/scans/'+encodeURI(sp.dataset.scan);
+    a.target='_blank'; a.textContent=sp.textContent; a.onclick=e=>e.stopPropagation();
+    sp.replaceWith(a);
+  });
+});
 // Scan Diff: compares the open ports of two observation sets (a Scan or a Source View) per target.
 function esc(s){ return String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]); }
 function testedOn(cell, label){

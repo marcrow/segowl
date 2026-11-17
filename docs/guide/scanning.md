@@ -55,7 +55,8 @@ a port wins (an open port seen once proves the flow passed), and disagreements s
 
 Move its file into a sub-folder of the Source's folder, e.g. `scans/<source_ip>/excluded/`: it is no longer
 read, only listed as excluded. Useful for a Scan that conflicts with the others (see the Conflicts table of the
-Scans tab).
+Scans tab). In the app, scan names in the report are clickable: they open the raw scan file
+(`.nmap` preferred, then `.gnmap`, then `.xml`) as plain text. The standalone `report.html` has no server, so scan names stay plain text there.
 
 A Source folder that is not an inventory IP is **ignored** and listed in the terminal and the Anomalies tab.
 The legacy layout `scans/<source_ip>.xml` is still accepted.

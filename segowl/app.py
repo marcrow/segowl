@@ -1089,6 +1089,9 @@ def make_handler(mission: Mission, users_file: Path, secure: bool, allowed_hosts
                 return self._page("Report", report_error_body(mission) if mission.error else body, "report")
             if url.path.startswith("/report/"):
                 return self._static(mission.file("report"), urllib.parse.unquote(url.path[len("/report/") :]))
+            if url.path.startswith("/scans/"):
+                stem = urllib.parse.unquote(url.path[len("/scans/") :])
+                return self._scan_file(mission.file("scans"), stem)
             self._send(404, page("Not found", "<main><p>Not found.</p></main>"))
 
         def _download(self, filename: str, data: bytes, ctype="application/zip"):
@@ -1101,6 +1104,15 @@ def make_handler(mission: Mission, users_file: Path, secure: bool, allowed_hosts
             ctype = "text/plain" if target.suffix == ".mmd" else mimetypes.guess_type(target.name)[0]
             ctype = ctype or "application/octet-stream"
             self._send(200, target.read_bytes(), ctype + "; charset=utf-8" * ctype.startswith("text/"))
+
+        def _scan_file(self, scans_root: Path, stem: str):
+            """Serve a scan file as text/plain; try .nmap > .gnmap > .xml (best for reading)."""
+            root = scans_root.resolve()
+            for ext in (".nmap", ".gnmap", ".xml"):
+                target = (scans_root / (stem + ext)).resolve()
+                if target.is_relative_to(root) and target.is_file():
+                    return self._send(200, target.read_bytes(), "text/plain; charset=utf-8")
+            self._send(404, b"not found", "text/plain")
 
         def do_POST(self):
             if not self._host_ok():

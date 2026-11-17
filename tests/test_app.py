@@ -60,6 +60,24 @@ def test_login_is_required_and_checked(served):
     assert fetch(base + "/report/../inventory.csv", cookie=cookie)[0] == 404
 
 
+def test_scan_file_route_serves_text_and_blocks_traversal(served):
+    base, mission = served
+    # unauthenticated: redirects
+    assert fetch(base + "/scans/172.31.250.1/broad")[1]["Location"] == "/login"
+    cookie = fetch(base + "/login", {"login": "alice", "password": "s3cret"})[1]["Set-Cookie"].split(";")[0]
+    # the fixture has broad.xml and broad.gnmap; no broad.nmap → serves .gnmap (second priority)
+    status, headers, body = fetch(base + "/scans/172.31.250.1/broad", cookie=cookie)
+    assert status == 200
+    assert headers["Content-Type"] == "text/plain; charset=utf-8"
+    assert headers["X-Content-Type-Options"] == "nosniff"
+    assert len(body) > 0
+    # path traversal: blocked
+    assert fetch(base + "/scans/../../inventory.csv", cookie=cookie)[0] == 404
+    assert fetch(base + "/scans/172.31.250.1/../../inventory.csv", cookie=cookie)[0] == 404
+    # non-existent scan: 404
+    assert fetch(base + "/scans/172.31.250.1/nonexistent", cookie=cookie)[0] == 404
+
+
 def test_network_address_needs_a_users_file(tmp_path):
     with pytest.raises(SystemExit, match="without authentication"):
         make_server(str(tmp_path / "m"), host="0.0.0.0", port=0, config=tmp_path / "empty")
