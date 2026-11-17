@@ -1,6 +1,6 @@
 # Report exclusions: Automation section and toggle in the HTML report
 
-Status: ready-for-agent
+Status: done
 
 Vocabulary: `GLOSSARY.md` (Automation, EXCLUDED). Depends on: `automations/` (engine and integration).
 

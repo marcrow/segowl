@@ -371,6 +371,7 @@ def _matrix_legend(policy: bool) -> str:
         + t("v-alive", "ping", "alive (ping/ARP)")
         + t("v-block", "×", "blocked")
         + t("v-none", "–", "unseen")
+        + t("v-excluded", "⊘", "excluded by Automations")
         + t("v-self", "", "same Machine")
         + t("v-open conflict", "ports", "Scans disagree")
         + '<span class="sep"></span>'
@@ -1154,6 +1155,40 @@ def _policy_tab(a: Analysis) -> str:
     )
 
 
+def _exclusion_section(a: Analysis) -> str:
+    """Section listing active exclusion Automations with their match count and affected Zones."""
+    if not a.exclusion_stats:
+        return ""
+    rows = []
+    for es in a.exclusion_stats:
+        zones = ", ".join(sorted(es.zones)) if es.zones else "—"
+        rows.append(
+            f"<tr><th>{es.automation.safe_name()}</th>"
+            f"<td><code>{es.automation.safe_condition()}</code></td>"
+            f"<td>{es.match_count}</td>"
+            f"<td>{html.escape(zones)}</td></tr>"
+        )
+    return _sec(
+        "Exclusion Automations",
+        '<p class="hint">Port observations matched by these Automations are removed from the analysis. '
+        "Tag Automations are not listed here (they label Machines, not exclude observations).</p>"
+        '<div class="tablewrap"><table class="fit"><thead><tr><th>label</th><th>condition</th>'
+        f"<th>observations</th><th>affected Zones</th></tr></thead><tbody>{''.join(rows)}</tbody>"
+        "</table></div>",
+    )
+
+
+def _excl_toggle(a: Analysis) -> str:
+    """Toggle button: show/hide excluded observations. Rendered only when exclusion Automations exist."""
+    if not a.exclusion_stats:
+        return ""
+    total = sum(es.match_count for es in a.exclusion_stats)
+    return (
+        f'<button class="btn excl-toggle" onclick="toggleExcluded()">'
+        f"Show exclusions <small>({total})</small></button>"
+    )
+
+
 def _tabs(a: Analysis) -> list[tuple[str, str, str, str, Callable[[Analysis], str]]]:
     """(key, title, count, one-line description, render) of the big tabs, in display order."""
     n_scans = sum(len(v) for v in a.scans.values())
@@ -1177,7 +1212,7 @@ def _tabs(a: Analysis) -> list[tuple[str, str, str, str, Callable[[Analysis], st
             "Scans",
             f"{n_scans} · {n_conf} conflict(s)",
             "coverage, conflicts, anomalies",
-            lambda a: _scans_tab(a) + _anomalies_tab(a),
+            lambda a: _exclusion_section(a) + _scans_tab(a) + _anomalies_tab(a),
         ),
         ("diff", "Diff", "", "before / after, Source vs Source", _diff_tab),
     ]
@@ -1237,7 +1272,7 @@ def write_html(a: Analysis, out_dir: str) -> str:
 <script>if(window.self!==window.top) document.body.classList.add('embed');</script>
 <header class="rhead"><div class="brand">{LOGO_SVG}<span>Seg<b>OWL</b></span></div>
 <div><h1>Network segmentation report</h1><div class="meta">{meta}</div></div></header>
-<div class="rtop"><div class="bigtabs">{buttons}</div>{_group_filter(a)}</div>
+<div class="rtop"><div class="bigtabs">{buttons}</div>{_excl_toggle(a)}{_group_filter(a)}</div>
 <main>{panes}</main>
 <script>{GRAPH_JS}</script>
 <script>{HTML_JS}</script></body></html>"""

@@ -227,6 +227,7 @@ class Analysis:
     # machine -> derived tags from Automations
     derived_tags: dict[str, set[str]] = field(default_factory=dict)
     automation_warnings: list[str] = field(default_factory=list)  # warnings from Automation evaluation
+    exclusion_stats: list = field(default_factory=list)  # ExclusionStats from run_automations
 
     @property
     def sources(self) -> list[str]:
@@ -330,6 +331,7 @@ def analyze(
     scans = {src: sorted(v, key=lambda sc: (sc.start_ts, sc.name)) for src, v in scans.items()}
     derived_tags: dict[str, set[str]] = {}
     auto_warnings: list[str] = []
+    excl_stats: list = []
     effective_scans = scans
     if automations:
         from segowl.automations import filter_scans, had_observations, run_automations
@@ -337,6 +339,7 @@ def analyze(
         result = run_automations(automations, inv, scans)
         derived_tags = result.derived_tags
         auto_warnings = result.warnings
+        excl_stats = result.exclusion_stats
         had_obs = had_observations(scans, inv)
         effective_scans = filter_scans(scans, result)
     matrix, unknown, pn_count = build_matrix(inv, effective_scans, force_pn)
@@ -363,4 +366,5 @@ def analyze(
         labels=labels or [],
         derived_tags=derived_tags,
         automation_warnings=auto_warnings,
+        exclusion_stats=excl_stats,
     )

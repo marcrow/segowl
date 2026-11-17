@@ -317,11 +317,21 @@ def extract_observations(inv: Inventory, scans: dict) -> list[dict]:
 
 
 @dataclass
+class ExclusionStats:
+    """Per-exclusion Automation: how many observations matched, and in which Zones."""
+
+    automation: Automation
+    match_count: int
+    zones: set[str]
+
+
+@dataclass
 class AutomationResult:
     derived_tags: dict[str, set[str]]  # machine -> derived tags
     excluded: set[tuple[str, str, int, str]]  # (source, target, port, protocol) to exclude
     excluded_grouped: set[tuple[str, str, str]]  # (source, target, protocol) grouped-ports exclusions
     warnings: list[str]
+    exclusion_stats: list[ExclusionStats] = field(default_factory=list)
 
 
 def run_automations(
@@ -350,16 +360,22 @@ def run_automations(
     # phase 2: exclusion automations (manual tags only, no chaining per spec rule 6)
     excl_autos = [a for a in automations if a.action == "exclude"]
     open_excluded = 0
+    exclusion_stats: list[ExclusionStats] = []
     for a in excl_autos:
         pred, _ = parse_condition(a.condition)
+        count = 0
+        zones: set[str] = set()
         for obs in observations:
             if pred(obs):
+                count += 1
+                zones.add(obs["zone"])
                 if obs.get("_grouped"):
                     excluded_grouped.add((obs["source"], obs["target"], obs["protocol"]))
                 else:
                     excluded.add((obs["source"], obs["target"], obs["port"], obs["protocol"]))
                 if obs["state"] == "open":
                     open_excluded += 1
+        exclusion_stats.append(ExclusionStats(a, count, zones))
 
     if open_excluded:
         warnings.append(
@@ -367,7 +383,7 @@ def run_automations(
             f"this hides Findings and Pivot Machines."
         )
 
-    return AutomationResult(derived_tags, excluded, excluded_grouped, warnings)
+    return AutomationResult(derived_tags, excluded, excluded_grouped, warnings, exclusion_stats)
 
 
 def filter_scans(

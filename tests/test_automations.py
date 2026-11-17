@@ -424,6 +424,154 @@ def test_derived_tags_available_in_analysis():
     assert "windows" in a.derived_tags.get("app-01", set())
 
 
+# ---------------------------------------------------------------- exclusion stats and report section
+
+
+def test_exclusion_stats_counts_and_zones():
+    inv = load_inventory(str(MISSION / "inventory.csv"))
+    scans = {
+        "172.31.250.1": [
+            Scan(
+                path="x.xml",
+                source="172.31.250.1",
+                hosts={
+                    "172.31.250.10": HostRecord(
+                        state="up", ports=[(22, "tcp", "closed"), (80, "tcp", "open")]
+                    ),
+                    "172.31.250.20": HostRecord(state="up", ports=[(5432, "tcp", "open")]),
+                },
+            )
+        ]
+    }
+    autos = [
+        Automation("noise", "exclude", "state = closed"),
+        Automation("tag-only", "tag", "port = 80", "web"),
+    ]
+    result = run_automations(autos, inv, scans)
+    assert len(result.exclusion_stats) == 1
+    es = result.exclusion_stats[0]
+    assert es.automation.name == "noise"
+    assert es.match_count == 1
+    assert es.zones == {"dmz"}
+
+
+def test_exclusion_stats_in_analysis():
+    from segowl.analysis import analyze
+
+    inv = load_inventory(str(MISSION / "inventory.csv"))
+    scans = {
+        "172.31.250.1": [
+            Scan(
+                path="x.xml",
+                source="172.31.250.1",
+                hosts={
+                    "172.31.250.10": HostRecord(state="up", ports=[(80, "tcp", "open")]),
+                },
+            )
+        ]
+    }
+    autos = [Automation("all", "exclude", "port = 80")]
+    a = analyze(inv, scans, [], automations=autos, force_pn=True)
+    assert len(a.exclusion_stats) == 1
+    assert a.exclusion_stats[0].match_count == 1
+
+
+def test_exclusion_section_in_html_report(tmp_path):
+    """The Exclusion Automations section appears in the report with correct data."""
+    from segowl.analysis import analyze
+    from segowl.render.html import write_html
+
+    inv = load_inventory(str(MISSION / "inventory.csv"))
+    scans = {
+        "172.31.250.1": [
+            Scan(
+                path="x.xml",
+                source="172.31.250.1",
+                hosts={
+                    "172.31.250.10": HostRecord(
+                        state="up", ports=[(22, "tcp", "closed"), (80, "tcp", "open")]
+                    ),
+                },
+            )
+        ]
+    }
+    autos = [
+        Automation("noise", "exclude", "state = closed"),
+        Automation("tag-only", "tag", "port = 80", "web"),
+    ]
+    a = analyze(inv, scans, [], automations=autos, force_pn=True)
+    doc = open(write_html(a, str(tmp_path)), encoding="utf-8").read()
+    assert "Exclusion Automations" in doc
+    assert "noise" in doc
+    assert "state = closed" in doc
+    # tag automation must NOT appear in the exclusion section
+    assert doc.count("tag-only") == 0
+
+
+def test_exclusion_section_absent_without_exclusions(tmp_path):
+    from segowl.analysis import analyze
+    from segowl.render.html import write_html
+
+    inv = load_inventory(str(MISSION / "inventory.csv"))
+    scans = {
+        "172.31.250.1": [
+            Scan(
+                path="x.xml",
+                source="172.31.250.1",
+                hosts={"172.31.250.10": HostRecord(state="up", ports=[(80, "tcp", "open")])},
+            )
+        ]
+    }
+    a = analyze(inv, scans, [])
+    doc = open(write_html(a, str(tmp_path)), encoding="utf-8").read()
+    assert "Exclusion Automations" not in doc
+    assert 'class="btn excl-toggle"' not in doc
+
+
+def test_exclusion_toggle_in_html_report(tmp_path):
+    """The toggle button is rendered only when exclusions exist."""
+    from segowl.analysis import analyze
+    from segowl.render.html import write_html
+
+    inv = load_inventory(str(MISSION / "inventory.csv"))
+    scans = {
+        "172.31.250.1": [
+            Scan(
+                path="x.xml",
+                source="172.31.250.1",
+                hosts={"172.31.250.10": HostRecord(state="up", ports=[(80, "tcp", "open")])},
+            )
+        ]
+    }
+    autos = [Automation("all", "exclude", "port = 80")]
+    a = analyze(inv, scans, [], automations=autos, force_pn=True)
+    doc = open(write_html(a, str(tmp_path)), encoding="utf-8").read()
+    assert "excl-toggle" in doc
+    assert "toggleExcluded" in doc
+    assert "Show exclusions" in doc
+
+
+def test_script_in_automation_name_is_escaped(tmp_path):
+    """XSS via automation name: html.escape must be applied."""
+    from segowl.analysis import analyze
+    from segowl.render.html import write_html
+
+    inv = load_inventory(str(MISSION / "inventory.csv"))
+    scans = {
+        "172.31.250.1": [
+            Scan(
+                path="x.xml",
+                source="172.31.250.1",
+                hosts={"172.31.250.10": HostRecord(state="up", ports=[(80, "tcp", "open")])},
+            )
+        ]
+    }
+    autos = [Automation("<script>alert(1)</script>", "exclude", "port = 80")]
+    a = analyze(inv, scans, [], automations=autos, force_pn=True)
+    doc = open(write_html(a, str(tmp_path)), encoding="utf-8").read()
+    assert "<script>alert(1)</script>" not in doc.split("</style>", 1)[-1].split("<script>")[0]
+
+
 # ---------------------------------------------------------------- app: Automations CRUD
 
 

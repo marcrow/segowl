@@ -1,6 +1,6 @@
 # Exclusion Automations section in the report
 
-Status: ready-for-agent
+Status: done
 Blocked by: –
 Spec: ../spec.md
 Type: task

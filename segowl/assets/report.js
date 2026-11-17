@@ -1,4 +1,15 @@
 let GROUP='';  // index of the selected Port Group, '' = all ports
+// Exclusion toggle: body.show-excluded reveals greyed-out excluded rows/cells
+let EXCL=false;
+function toggleExcluded(){
+  EXCL=!EXCL;
+  document.body.classList.toggle('show-excluded', EXCL);
+  const btn=document.querySelector('.excl-toggle');
+  if(btn){const s=btn.querySelector('small');btn.firstChild.textContent=EXCL?'Hide exclusions ':'Show exclusions ';if(s)btn.appendChild(s);}
+  try{localStorage.setItem('segowl-show-excluded', EXCL?'1':'');}catch(e){}
+}
+(function(){try{if(localStorage.getItem('segowl-show-excluded')==='1'){EXCL=true;document.body.classList.add('show-excluded');}}catch(e){}}
+document.addEventListener('DOMContentLoaded',function(){if(EXCL){var b=document.querySelector('.excl-toggle');if(b){var s=b.querySelector('small');b.firstChild.textContent='Hide exclusions ';if(s)b.appendChild(s);}}});})();
 // Draws the diagrams of scope that are shown (report_graph.js); Cytoscape needs a visible, sized box.
 function renderVisible(scope){ if(scope) drawVisibleGraphs(scope); }
 // Big tabs; the open tab is kept in the URL hash, so a reload (or a shared link) reopens it.

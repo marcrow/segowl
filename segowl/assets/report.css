@@ -178,3 +178,16 @@ td.st-closed{color:#5a6678;background:#f1f4f8}
 .pv h4{margin:4px 0 6px;font-size:12.5px;color:var(--slate)}
 .pv table.pd{width:100%}.pv td{white-space:normal}
 .pivot .gcy{height:460px;min-height:0}
+/* Exclusion toggle */
+.excl-toggle{background:#f5f0ff;border-color:#c4b5fd;color:#7c3aed;font-weight:600;white-space:nowrap}
+.excl-toggle:hover{border-color:#7c3aed}
+.excl-toggle small{font-weight:400;color:#9b8ec4;margin-left:2px}
+body.show-excluded .excl-toggle{background:#7c3aed;color:#fff;border-color:#7c3aed}
+body.show-excluded .excl-toggle small{color:#d4c8f5}
+/* Default: EXCLUDED cells/rows look like UNSEEN (hidden) */
+body:not(.show-excluded) :is(.mx td,.lt).v-excluded{background:#fff;color:#b8c1cd;border:1px dashed #c9d2dd}
+body:not(.show-excluded) :is(.mx td,.lt).v-excluded::after{display:none}
+body:not(.show-excluded) .vb.v-excluded{border:1px dashed #c9d2dd;color:#8994a3;background:transparent}
+/* When shown: greyed out (opacity) with the purple tint */
+body.show-excluded :is(.mx td,.lt).v-excluded{opacity:.6}
+body.show-excluded .vb.v-excluded{opacity:.7}

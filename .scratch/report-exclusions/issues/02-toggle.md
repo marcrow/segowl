@@ -1,6 +1,6 @@
 # Exclusion toggle in the report
 
-Status: ready-for-agent
+Status: done
 Blocked by: 01
 Spec: ../spec.md
 Type: task
