@@ -11,3 +11,5 @@ Rules for review that no automated check enforces. Ruff, the test suite and the 
   A change to the port label format (`22`, `udp:161`) or to range matching lands in all three.
 - **The report runs offline.** `report.html` inlines its scripts, `cytoscape.min.js` included, and loads
   nothing from the network (the target machine has no internet access).
+- **Overlay modals use `.mback` + `.vis`.** Never `hidden`; the backdrop animates via opacity.
+  `.mback` carries `pointer-events:none` by default so it doesn't block the page when invisible.

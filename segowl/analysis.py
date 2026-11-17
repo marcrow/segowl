@@ -224,7 +224,8 @@ class Analysis:
     policy: list[Rule] | None = None  # None = no Flow Policy: no Findings, no policy colouring
     excluded: dict[str, list[str]] = field(default_factory=dict)  # source ip -> parked scan files, not read
     labels: list[tuple[str, ...]] = field(default_factory=list)  # Port Labels (scan_profiles.load_labels)
-    derived_tags: dict[str, set[str]] = field(default_factory=dict)  # machine -> derived tags from Automations
+    # machine -> derived tags from Automations
+    derived_tags: dict[str, set[str]] = field(default_factory=dict)
     automation_warnings: list[str] = field(default_factory=list)  # warnings from Automation evaluation
 
     @property
@@ -332,6 +333,7 @@ def analyze(
     effective_scans = scans
     if automations:
         from segowl.automations import filter_scans, had_observations, run_automations
+
         result = run_automations(automations, inv, scans)
         derived_tags = result.derived_tags
         auto_warnings = result.warnings

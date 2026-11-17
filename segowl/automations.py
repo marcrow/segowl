@@ -30,6 +30,7 @@ MAX_DEPTH = 4
 
 # ---------------------------------------------------------------- condition parser
 
+
 class ParseError(Exception):
     pass
 
@@ -42,21 +43,21 @@ def _tokenize(text: str) -> list[str]:
         if text[i].isspace():
             i += 1
         elif text[i] == '"':
-            j = text.index('"', i + 1) if '"' in text[i + 1:] else n
-            tokens.append(text[i + 1:j])
+            j = text.index('"', i + 1) if '"' in text[i + 1 :] else n
+            tokens.append(text[i + 1 : j])
             i = j + 1
-        elif text[i] in '()':
+        elif text[i] in "()":
             tokens.append(text[i])
             i += 1
-        elif text[i:i + 2] == '!=':
-            tokens.append('!=')
+        elif text[i : i + 2] == "!=":
+            tokens.append("!=")
             i += 2
-        elif text[i] == '=':
-            tokens.append('=')
+        elif text[i] == "=":
+            tokens.append("=")
             i += 1
         else:
             j = i
-            while j < n and text[j] not in ' \t"()=' and text[j:j + 2] != '!=':
+            while j < n and text[j] not in ' \t"()=' and text[j : j + 2] != "!=":
                 j += 1
             tokens.append(text[i:j])
             i = j
@@ -88,7 +89,11 @@ class _Parser:
             self.eat("or")
             right = self.parse_and()
             a, b = left, right
-            left = lambda obs, _a=a, _b=b: _a(obs) or _b(obs)
+
+            def _or(obs, _a=a, _b=b):
+                return _a(obs) or _b(obs)
+
+            left = _or
         return left
 
     def parse_and(self):
@@ -97,7 +102,11 @@ class _Parser:
             self.eat("and")
             right = self.parse_atom()
             a, b = left, right
-            left = lambda obs, _a=a, _b=b: _a(obs) and _b(obs)
+
+            def _and(obs, _a=a, _b=b):
+                return _a(obs) and _b(obs)
+
+            left = _and
         return left
 
     def parse_atom(self):
@@ -186,6 +195,7 @@ def is_portable(fields_used: set[str]) -> bool:
 
 # ---------------------------------------------------------------- Automation data
 
+
 @dataclass
 class Automation:
     name: str
@@ -252,6 +262,7 @@ def save_automations(path: str | Path, automations: list[Automation]) -> None:
 
 # ---------------------------------------------------------------- observation extraction
 
+
 def extract_observations(inv: Inventory, scans: dict) -> list[dict]:
     """Build the flat list of observations from parsed scans.
 
@@ -272,33 +283,38 @@ def extract_observations(inv: Inventory, scans: dict) -> list[dict]:
                     continue
                 tags = [t.strip() for t in dst.extra.get("tags", "").split(",") if t.strip()]
                 for port, proto, state in rec.ports:
-                    obs.append({
-                        "source": src,
-                        "target": dip,
-                        "port": port,
-                        "protocol": proto,
-                        "state": state,
-                        "zone": dst.zone,
-                        "machine": dst.machine,
-                        "tag": tags,
-                    })
+                    obs.append(
+                        {
+                            "source": src,
+                            "target": dip,
+                            "port": port,
+                            "protocol": proto,
+                            "state": state,
+                            "zone": dst.zone,
+                            "machine": dst.machine,
+                            "tag": tags,
+                        }
+                    )
                 # grouped ports (rec.rest): a state like "closed" covering a range of ports
-                for proto, ranges, state in rec.rest:
-                    obs.append({
-                        "source": src,
-                        "target": dip,
-                        "port": 0,  # sentinel: grouped ports have no single port number
-                        "protocol": proto,
-                        "state": state,
-                        "zone": dst.zone,
-                        "machine": dst.machine,
-                        "tag": tags,
-                        "_grouped": True,
-                    })
+                for proto, _ranges, state in rec.rest:
+                    obs.append(
+                        {
+                            "source": src,
+                            "target": dip,
+                            "port": 0,  # sentinel: grouped ports have no single port number
+                            "protocol": proto,
+                            "state": state,
+                            "zone": dst.zone,
+                            "machine": dst.machine,
+                            "tag": tags,
+                            "_grouped": True,
+                        }
+                    )
     return obs
 
 
 # ---------------------------------------------------------------- engine
+
 
 @dataclass
 class AutomationResult:
@@ -381,10 +397,11 @@ def filter_scans(
                     for proto, ranges, st in rec.rest
                     if (src, dip, proto) not in result.excluded_grouped
                 ]
-                ignored = rec.ignored if not any(
-                    (src, dip, proto) in result.excluded_grouped
-                    for proto, _, _ in rec.rest
-                ) else []
+                ignored = (
+                    rec.ignored
+                    if not any((src, dip, proto) in result.excluded_grouped for proto, _, _ in rec.rest)
+                    else []
+                )
                 new_hosts[dip] = HostRecord(
                     state=rec.state,
                     name=rec.name,
@@ -392,16 +409,18 @@ def filter_scans(
                     ignored=ignored,
                     rest=rest,
                 )
-            new_list.append(Scan(
-                path=sc.path,
-                source=sc.source,
-                command=sc.command,
-                started=sc.started,
-                start_ts=sc.start_ts,
-                pn=sc.pn,
-                coverage=sc.coverage,
-                hosts=new_hosts,
-            ))
+            new_list.append(
+                Scan(
+                    path=sc.path,
+                    source=sc.source,
+                    command=sc.command,
+                    started=sc.started,
+                    start_ts=sc.start_ts,
+                    pn=sc.pn,
+                    coverage=sc.coverage,
+                    hosts=new_hosts,
+                )
+            )
         out[src] = new_list
     return out
 

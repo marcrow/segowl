@@ -32,6 +32,7 @@ from pathlib import Path
 from segowl import cli, kits
 from segowl import mission_files as mf
 from segowl import scan_profiles as sp
+from segowl.automations import Automation, ParseError, load_automations, parse_condition, save_automations
 from segowl.inventory import BASE_COLUMNS, load_inventory
 from segowl.nmap import SCAN_EXT_PRIORITY, discover_scans, parse_scan
 from segowl.policy import _kind as policy_kind
@@ -41,7 +42,6 @@ from segowl.port_groups import DEFAULTS as GROUP_DEFAULTS
 from segowl.port_groups import load_port_groups
 from segowl.ports import parse_port_set
 from segowl.scan_profiles import NAME_RE
-from segowl.automations import Automation, load_automations, parse_condition, save_automations, ParseError
 from segowl.verdict import ALIVE, VERDICT_NAME, classify
 
 ASSETS = Path(__file__).parent / "assets"
@@ -171,7 +171,8 @@ class Mission:
 
     # ---- inventory editor
     def fps(self) -> dict[str, str]:
-        return {n: fingerprint(self.file(n)) for n in ("inventory.csv", "zones.csv", "flow_policy.csv", "automations.ini")}
+        names = ("inventory.csv", "zones.csv", "flow_policy.csv", "automations.ini")
+        return {n: fingerprint(self.file(n)) for n in names}
 
     def inventory(self) -> dict:
         free, rows = mf.read_inventory(self.text("inventory.csv"))
@@ -630,8 +631,9 @@ class Mission:
             return {}
         if not self.file("scans").is_dir():
             return {}
-        from segowl.automations import extract_observations, run_automations
+        from segowl.automations import run_automations
         from segowl.nmap import discover_scans, parse_scan
+
         scans_dict = {}
         for src, paths in discover_scans(str(self.file("scans"))).items():
             if src in inv:
@@ -650,8 +652,7 @@ class Mission:
         return {
             "fp": fingerprint(path),
             "automations": [
-                {"name": a.name, "action": a.action, "condition": a.condition, "tag": a.tag}
-                for a in autos
+                {"name": a.name, "action": a.action, "condition": a.condition, "tag": a.tag} for a in autos
             ],
         }
 
@@ -675,6 +676,7 @@ class Mission:
                 continue
             if action == "tag":
                 from segowl.automations import TAG_RE
+
                 if not tag or not TAG_RE.match(tag):
                     errors.append(f"{name}: tag action requires a valid tag name ([a-z0-9_-])")
                     continue
@@ -704,6 +706,7 @@ class Mission:
         except ParseError as e:
             return {"error": str(e)}
         from segowl.automations import extract_observations
+
         try:
             inv = load_inventory(str(self.file("inventory.csv")))
         except SystemExit:
@@ -711,6 +714,7 @@ class Mission:
         scans_dict = {}
         if self.file("scans").is_dir():
             from segowl.nmap import discover_scans, parse_scan
+
             for src, paths in discover_scans(str(self.file("scans"))).items():
                 if src in inv:
                     scans_dict[src] = [parse_scan(p, src) for p in paths]

@@ -165,7 +165,9 @@ def _zone_matrix_html(
         for zd in zones:
             a = agg.get((zs, zd)) or ZoneAgg()
             st = (status or {}).get((zs, zd))
-            txt = _ports_html(a.open_ports, highlight, cap=6) if a.verdict == OPEN else MARK.get(a.verdict, "")
+            txt = (
+                _ports_html(a.open_ports, highlight, cap=6) if a.verdict == OPEN else MARK.get(a.verdict, "")
+            )
             pairs = (
                 f'<small class="pairs">{a.pass_pairs}/{a.total_pairs} pairs</small>'
                 if a.verdict >= ALIVE
@@ -270,7 +272,9 @@ def _source_table_html(src: str, a: Analysis) -> str:
             f"<td>{_tested_html(c)}</td>"
             f"<td>{', '.join(_scan_name(s) for s in c.scans)}</td>"
             + "".join(
-                f"<td>{html.escape(_all_tags(inv[d], a.derived_tags) if k == 'tags' else inv[d].extra.get(k, ''))}</td>"
+                "<td>{}</td>".format(
+                    html.escape(_all_tags(inv[d], a.derived_tags) if k == "tags" else inv[d].extra.get(k, ""))
+                )
                 for k in extras
             )
             + "</tr>"
@@ -1213,8 +1217,7 @@ def write_html(a: Analysis, out_dir: str) -> str:
         auto_meta += f' · <span class="warn">{html.escape(a.automation_warnings[0])}</span>'
     meta = (
         f"{len(a.inv)} targets · {len(a.sources)} Source(s) · {n_scans} Scan(s) · "
-        f"{len(a.unknown)} host(s) outside the inventory · {len(a.orphan)} ignored Scan(s)"
-        + auto_meta
+        f"{len(a.unknown)} host(s) outside the inventory · {len(a.orphan)} ignored Scan(s)" + auto_meta
     )
     buttons = "".join(
         f'<a class="{"on" if i == 0 else ""}" data-tab="{key}" href="#{key}" '

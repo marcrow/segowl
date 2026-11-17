@@ -1,6 +1,5 @@
 """Tests for the Automations engine: parser, evaluation, tag/exclude actions."""
 
-import os
 import shutil
 from pathlib import Path
 
@@ -8,9 +7,7 @@ import pytest
 
 from segowl.automations import (
     Automation,
-    AutomationResult,
     ParseError,
-    extract_observations,
     is_portable,
     load_automations,
     parse_condition,
@@ -213,13 +210,20 @@ def test_percent_in_condition_does_not_crash(tmp_path):
 
 def test_tag_automation_derives_tag():
     inv = load_inventory(str(MISSION / "inventory.csv"))
-    scans = {"172.31.250.1": [Scan(
-        path="x.xml", source="172.31.250.1",
-        hosts={
-            "172.31.250.10": HostRecord(state="up", ports=[(80, "tcp", "open"), (443, "tcp", "open")]),
-            "172.31.250.20": HostRecord(state="up", ports=[(5432, "tcp", "open")]),
-        },
-    )]}
+    scans = {
+        "172.31.250.1": [
+            Scan(
+                path="x.xml",
+                source="172.31.250.1",
+                hosts={
+                    "172.31.250.10": HostRecord(
+                        state="up", ports=[(80, "tcp", "open"), (443, "tcp", "open")]
+                    ),
+                    "172.31.250.20": HostRecord(state="up", ports=[(5432, "tcp", "open")]),
+                },
+            )
+        ]
+    }
     autos = [Automation("web", "tag", "port = 80 or port = 443", "web_server")]
     result = run_automations(autos, inv, scans)
     assert "web_server" in result.derived_tags.get("app-01", set())
@@ -231,12 +235,19 @@ def test_tag_automation_derives_tag():
 
 def test_exclude_removes_observations():
     inv = load_inventory(str(MISSION / "inventory.csv"))
-    scans = {"172.31.250.1": [Scan(
-        path="x.xml", source="172.31.250.1",
-        hosts={
-            "172.31.250.10": HostRecord(state="up", ports=[(22, "tcp", "closed"), (80, "tcp", "open")]),
-        },
-    )]}
+    scans = {
+        "172.31.250.1": [
+            Scan(
+                path="x.xml",
+                source="172.31.250.1",
+                hosts={
+                    "172.31.250.10": HostRecord(
+                        state="up", ports=[(22, "tcp", "closed"), (80, "tcp", "open")]
+                    ),
+                },
+            )
+        ]
+    }
     autos = [Automation("noise", "exclude", "state = closed")]
     result = run_automations(autos, inv, scans)
     assert ("172.31.250.1", "172.31.250.10", 22, "tcp") in result.excluded
@@ -245,10 +256,15 @@ def test_exclude_removes_observations():
 
 def test_open_state_exclusion_warns():
     inv = load_inventory(str(MISSION / "inventory.csv"))
-    scans = {"172.31.250.1": [Scan(
-        path="x.xml", source="172.31.250.1",
-        hosts={"172.31.250.10": HostRecord(state="up", ports=[(80, "tcp", "open")])},
-    )]}
+    scans = {
+        "172.31.250.1": [
+            Scan(
+                path="x.xml",
+                source="172.31.250.1",
+                hosts={"172.31.250.10": HostRecord(state="up", ports=[(80, "tcp", "open")])},
+            )
+        ]
+    }
     autos = [Automation("risky", "exclude", "state = open")]
     result = run_automations(autos, inv, scans)
     assert any("open-port" in w for w in result.warnings)
@@ -268,16 +284,21 @@ def test_port_not_equal_does_not_match_grouped_observations():
 def test_port_specific_exclusion_does_not_drop_grouped():
     """port = 22 and state = closed must NOT exclude a grouped 'closed 1-1024' range."""
     inv = load_inventory(str(MISSION / "inventory.csv"))
-    scans = {"172.31.250.1": [Scan(
-        path="x.xml", source="172.31.250.1",
-        hosts={
-            "172.31.250.10": HostRecord(
-                state="up",
-                ports=[(22, "tcp", "closed"), (80, "tcp", "open")],
-                rest=[("tcp", [(1, 1024)], "closed")],
-            ),
-        },
-    )]}
+    scans = {
+        "172.31.250.1": [
+            Scan(
+                path="x.xml",
+                source="172.31.250.1",
+                hosts={
+                    "172.31.250.10": HostRecord(
+                        state="up",
+                        ports=[(22, "tcp", "closed"), (80, "tcp", "open")],
+                        rest=[("tcp", [(1, 1024)], "closed")],
+                    ),
+                },
+            )
+        ]
+    }
     autos = [Automation("ssh-only", "exclude", "port = 22 and state = closed")]
     result = run_automations(autos, inv, scans)
     assert ("172.31.250.1", "172.31.250.10", 22, "tcp") in result.excluded
@@ -286,22 +307,25 @@ def test_port_specific_exclusion_does_not_drop_grouped():
 
 def test_exclude_matches_grouped_ports():
     inv = load_inventory(str(MISSION / "inventory.csv"))
-    scans = {"172.31.250.1": [Scan(
-        path="x.xml", source="172.31.250.1",
-        hosts={
-            "172.31.250.10": HostRecord(
-                state="up",
-                ports=[(80, "tcp", "open")],
-                rest=[("tcp", [(1, 1024)], "closed")],
-                ignored=[("closed", 1000)],
-            ),
-        },
-    )]}
+    scans = {
+        "172.31.250.1": [
+            Scan(
+                path="x.xml",
+                source="172.31.250.1",
+                hosts={
+                    "172.31.250.10": HostRecord(
+                        state="up",
+                        ports=[(80, "tcp", "open")],
+                        rest=[("tcp", [(1, 1024)], "closed")],
+                        ignored=[("closed", 1000)],
+                    ),
+                },
+            )
+        ]
+    }
     autos = [Automation("noise", "exclude", "state = closed")]
     result = run_automations(autos, inv, scans)
     assert ("172.31.250.1", "172.31.250.10", "tcp") in result.excluded_grouped
-
-
 
 
 # ---------------------------------------------------------------- integration: exclusion changes the verdict
@@ -311,13 +335,20 @@ def test_exclusion_changes_verdict_in_analysis():
     from segowl.analysis import analyze
 
     inv = load_inventory(str(MISSION / "inventory.csv"))
-    scans = {"172.31.250.1": [Scan(
-        path="x.xml", source="172.31.250.1",
-        hosts={
-            "172.31.250.10": HostRecord(state="up", ports=[(22, "tcp", "closed"), (80, "tcp", "open")]),
-            "172.31.250.20": HostRecord(state="up", ports=[(5432, "tcp", "open")]),
-        },
-    )]}
+    scans = {
+        "172.31.250.1": [
+            Scan(
+                path="x.xml",
+                source="172.31.250.1",
+                hosts={
+                    "172.31.250.10": HostRecord(
+                        state="up", ports=[(22, "tcp", "closed"), (80, "tcp", "open")]
+                    ),
+                    "172.31.250.20": HostRecord(state="up", ports=[(5432, "tcp", "open")]),
+                },
+            )
+        ]
+    }
     # without automations: app-01 is OPEN (port 80)
     a0 = analyze(inv, scans, [])
     assert a0.matrix["172.31.250.1"]["172.31.250.10"].verdict == 3  # OPEN
@@ -334,12 +365,18 @@ def test_full_exclusion_gives_excluded_verdict():
     from segowl.verdict import EXCLUDED
 
     inv = load_inventory(str(MISSION / "inventory.csv"))
-    scans = {"172.31.250.1": [Scan(
-        path="x.xml", source="172.31.250.1", pn=True,
-        hosts={
-            "172.31.250.10": HostRecord(state="up", ports=[(80, "tcp", "open")]),
-        },
-    )]}
+    scans = {
+        "172.31.250.1": [
+            Scan(
+                path="x.xml",
+                source="172.31.250.1",
+                pn=True,
+                hosts={
+                    "172.31.250.10": HostRecord(state="up", ports=[(80, "tcp", "open")]),
+                },
+            )
+        ]
+    }
     autos = [Automation("all", "exclude", "port = 80")]
     a = analyze(inv, scans, [], automations=autos, force_pn=True)
     assert a.matrix["172.31.250.1"]["172.31.250.10"].verdict == EXCLUDED
@@ -350,12 +387,17 @@ def test_full_exclusion_with_discovery_gives_alive():
     from segowl.verdict import ALIVE
 
     inv = load_inventory(str(MISSION / "inventory.csv"))
-    scans = {"172.31.250.1": [Scan(
-        path="x.xml", source="172.31.250.1",
-        hosts={
-            "172.31.250.10": HostRecord(state="up", ports=[(80, "tcp", "open")]),
-        },
-    )]}
+    scans = {
+        "172.31.250.1": [
+            Scan(
+                path="x.xml",
+                source="172.31.250.1",
+                hosts={
+                    "172.31.250.10": HostRecord(state="up", ports=[(80, "tcp", "open")]),
+                },
+            )
+        ]
+    }
     autos = [Automation("all", "exclude", "port = 80")]
     a = analyze(inv, scans, [], automations=autos)
     # host answered discovery → ALIVE, not EXCLUDED
@@ -366,12 +408,17 @@ def test_derived_tags_available_in_analysis():
     from segowl.analysis import analyze
 
     inv = load_inventory(str(MISSION / "inventory.csv"))
-    scans = {"172.31.250.1": [Scan(
-        path="x.xml", source="172.31.250.1",
-        hosts={
-            "172.31.250.10": HostRecord(state="up", ports=[(3389, "tcp", "open")]),
-        },
-    )]}
+    scans = {
+        "172.31.250.1": [
+            Scan(
+                path="x.xml",
+                source="172.31.250.1",
+                hosts={
+                    "172.31.250.10": HostRecord(state="up", ports=[(3389, "tcp", "open")]),
+                },
+            )
+        ]
+    }
     autos = [Automation("win", "tag", "port = 3389 and state = open", "windows")]
     a = analyze(inv, scans, [], automations=autos)
     assert "windows" in a.derived_tags.get("app-01", set())
@@ -384,7 +431,8 @@ def test_derived_tags_available_in_analysis():
 
 
 def test_kit_saves_only_portable_automations(tmp_path):
-    from segowl.kits import save_kit, read_dirs
+    from segowl.kits import save_kit
+
     mission = tmp_path / "mission"
     shutil.copytree(MISSION, mission)
     # Create automations: one portable, one not
@@ -405,6 +453,7 @@ def test_kit_saves_only_portable_automations(tmp_path):
 
 def test_kit_no_automations_when_all_non_portable(tmp_path):
     from segowl.kits import save_kit
+
     mission = tmp_path / "mission"
     shutil.copytree(MISSION, mission)
     save_automations(
@@ -419,6 +468,7 @@ def test_kit_no_automations_when_all_non_portable(tmp_path):
 
 def test_automations_crud_via_mission(tmp_path):
     from segowl.app import Mission
+
     m = tmp_path / "mission"
     shutil.copytree(MISSION, m)
     mission = Mission(m)
@@ -426,13 +476,15 @@ def test_automations_crud_via_mission(tmp_path):
     d = mission.automations()
     assert d["automations"] == []
     # save two automations
-    mission.save_automations({
-        "fp": d["fp"],
-        "automations": [
-            {"name": "web", "action": "tag", "condition": "port = 80 or port = 443", "tag": "web"},
-            {"name": "noise", "action": "exclude", "condition": "state = closed"},
-        ],
-    })
+    mission.save_automations(
+        {
+            "fp": d["fp"],
+            "automations": [
+                {"name": "web", "action": "tag", "condition": "port = 80 or port = 443", "tag": "web"},
+                {"name": "noise", "action": "exclude", "condition": "state = closed"},
+            ],
+        }
+    )
     d = mission.automations()
     assert len(d["automations"]) == 2
     assert d["automations"][0]["name"] == "web"
@@ -451,23 +503,27 @@ def test_excluded_verdict_appears_in_html_report(tmp_path):
     # Create scans
     scans_dir = mission / "scans" / "172.31.250.1"
     scans_dir.mkdir(parents=True, exist_ok=True)
-    from segowl.nmap import Scan, HostRecord
     import xml.etree.ElementTree as ET
+
     # Minimal nmap XML with one open port
     root = ET.Element("nmaprun", start="1700000000", scanner="nmap", args="nmap -sS")
     host = ET.SubElement(root, "host")
     ET.SubElement(host, "status", state="up")
-    addr = ET.SubElement(host, "address", addr="172.31.250.10", addrtype="ipv4")
+    ET.SubElement(host, "address", addr="172.31.250.10", addrtype="ipv4")
     ports_el = ET.SubElement(host, "ports")
     port_el = ET.SubElement(ports_el, "port", protocol="tcp", portid="80")
     ET.SubElement(port_el, "state", state="open")
     tree = ET.ElementTree(root)
     tree.write(str(scans_dir / "scan.xml"), xml_declaration=True)
     # automations: tag and exclude
-    save_automations(mission / "automations.ini", [
-        Automation("web", "tag", "port = 80 and state = open", "web_server"),
-    ])
-    from segowl.cli import run, parse_args
+    save_automations(
+        mission / "automations.ini",
+        [
+            Automation("web", "tag", "port = 80 and state = open", "web_server"),
+        ],
+    )
+    from segowl.cli import parse_args, run
+
     args = parse_args([str(mission)])
     lines = run(args)
     report = (mission / "report" / "report.html").read_text()

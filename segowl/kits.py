@@ -74,6 +74,7 @@ def _save_portable_automations(mission: Path, kit: Path) -> None:
         (kit / "automations.ini").unlink(missing_ok=True)
         return
     from segowl.automations import is_portable, load_automations, save_automations
+
     try:
         autos = load_automations(src)
     except ValueError:
@@ -112,9 +113,10 @@ def _ini_table(path: Path) -> dict[str, str]:
     if not path.is_file():
         return {}
     import configparser
+
     cp = configparser.ConfigParser(interpolation=None)
     cp.read(path, encoding="utf-8")
-    return {name: f"{cp[name].get('action','')} {cp[name].get('condition','')}" for name in cp.sections()}
+    return {name: f"{cp[name].get('action', '')} {cp[name].get('condition', '')}" for name in cp.sections()}
 
 
 def diff(mission: Path, kit: Path) -> dict[str, dict]:
@@ -146,6 +148,7 @@ def _merge_automations(mission: Path, kit: Path) -> None:
     if not kit_ini.is_file():
         return
     from segowl.automations import load_automations, save_automations
+
     kit_autos = load_automations(kit_ini)
     mission_ini = mission / "automations.ini"
     existing = load_automations(mission_ini) if mission_ini.is_file() else []
@@ -228,6 +231,7 @@ def check(folder: Path) -> list[str]:
     auto_file = folder / "automations.ini"
     if auto_file.is_file():
         from segowl.automations import load_automations
+
         try:
             load_automations(auto_file)
         except ValueError as e:

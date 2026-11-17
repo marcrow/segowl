@@ -96,6 +96,7 @@ def run(args: argparse.Namespace) -> list[str]:
         auto_path = os.path.join(args.mission, "automations.ini")
         if os.path.isfile(auto_path):
             from segowl.automations import load_automations
+
             try:
                 automations = load_automations(auto_path)
             except ValueError as e:

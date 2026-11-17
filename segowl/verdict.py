@@ -8,7 +8,14 @@ from segowl.nmap import HostRecord
 from segowl.ports import Port, Ranges, in_ranges, ports_text
 
 OPEN, REACH, ALIVE, BLOCK, NODATA, EXCLUDED = 3, 2, 1, 0, -1, -2
-VERDICT_NAME = {OPEN: "OPEN", REACH: "REACHABLE", ALIVE: "ALIVE", BLOCK: "BLOCKED", NODATA: "UNSEEN", EXCLUDED: "EXCLUDED"}
+VERDICT_NAME = {
+    OPEN: "OPEN",
+    REACH: "REACHABLE",
+    ALIVE: "ALIVE",
+    BLOCK: "BLOCKED",
+    NODATA: "UNSEEN",
+    EXCLUDED: "EXCLUDED",
+}
 SYM = {OPEN: "OPEN", REACH: "o", ALIVE: "~", BLOCK: "x", NODATA: ".", EXCLUDED: "⊘"}
 # Port states from most to least permissive: the Source View keeps the highest (ADR-0001)
 STATE_RANK = {
@@ -19,7 +26,14 @@ STATE_RANK = {
     "open|filtered": 1,
     "closed|filtered": 1,
 }
-VCLASS = {OPEN: "v-open", REACH: "v-reach", ALIVE: "v-alive", BLOCK: "v-block", NODATA: "v-none", EXCLUDED: "v-excluded"}
+VCLASS = {
+    OPEN: "v-open",
+    REACH: "v-reach",
+    ALIVE: "v-alive",
+    BLOCK: "v-block",
+    NODATA: "v-none",
+    EXCLUDED: "v-excluded",
+}
 
 
 @dataclass

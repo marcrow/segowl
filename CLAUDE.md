@@ -1,3 +1,13 @@
+## Dev server
+
+`uv run segowl serve <mission-folder> --port 8000`
+
+## Web app UI patterns
+
+CSS components (`.mback`, `.seg`, `.pill`, `.card`, `.btn`) and JS globals (`$`, `esc`, `api`, `toast`)
+are defined in `segowl/assets/app.css` and `segowl/assets/app_common.js`.
+Read both before writing a new page.
+
 ## Agent skills
 
 ### Issue tracker
