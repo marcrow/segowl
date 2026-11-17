@@ -1,6 +1,6 @@
 # Verdict tooltips on detail view badges
 
-Status: resolved
+Status: done
 Blocked by: –
 Spec: ../spec.md
 Type: task

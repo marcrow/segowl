@@ -70,10 +70,15 @@ def test_scan_file_route_serves_text_and_blocks_traversal(served):
     assert status == 200
     assert headers["Content-Type"] == "text/plain; charset=utf-8"
     assert headers["X-Content-Type-Options"] == "nosniff"
-    assert len(body) > 0
-    # path traversal: blocked
-    assert fetch(base + "/scans/../../inventory.csv", cookie=cookie)[0] == 404
-    assert fetch(base + "/scans/172.31.250.1/../../inventory.csv", cookie=cookie)[0] == 404
+    assert "Host:" in body  # gnmap format
+    # xml-only scan falls back to .xml
+    status2, _, body2 = fetch(base + "/scans/172.31.250.1/targeted", cookie=cookie)
+    assert status2 == 200 and "<?xml" in body2
+    # path traversal: blocked — plant a file outside scans/ and try to reach it
+    (mission / "outside.xml").write_text("should not be served")
+    assert fetch(base + "/scans/../outside", cookie=cookie)[0] == 404
+    assert fetch(base + "/scans/%2e%2e/outside", cookie=cookie)[0] == 404
+    assert fetch(base + "/scans/172.31.250.1/../../outside", cookie=cookie)[0] == 404
     # non-existent scan: 404
     assert fetch(base + "/scans/172.31.250.1/nonexistent", cookie=cookie)[0] == 404
 

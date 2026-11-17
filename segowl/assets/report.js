@@ -110,7 +110,7 @@ function toggleMore(tr){
 window.addEventListener('DOMContentLoaded',()=>{
   enhanceTables(document);
   if(window.self!==window.top) document.querySelectorAll('.scan-name[data-scan]').forEach(sp=>{
-    const a=document.createElement('a'); a.href='/scans/'+encodeURI(sp.dataset.scan);
+    const a=document.createElement('a'); a.href='/scans/'+sp.dataset.scan.split('/').map(encodeURIComponent).join('/');
     a.target='_blank'; a.textContent=sp.textContent; a.onclick=e=>e.stopPropagation();
     sp.replaceWith(a);
   });

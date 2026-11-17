@@ -60,3 +60,6 @@ def test_report_has_the_seven_big_tabs_and_loads_nothing_from_the_network(tmp_pa
     assert tabs == ["global", "policy", "pivots", "persource", "pertarget", "scans", "diff"]
     assert not re.search(r'<script[^>]+src=|<link[^>]+href="http', doc)  # offline: everything inlined
     assert "mermaid" not in doc.lower()  # every diagram is Cytoscape; the .mmd exports stay files
+    assert 'title="At least one open port' in doc  # verdict tooltips
+    assert 'class="scan-name"' in doc  # scan names with data attr for JS activation
+    assert 'href="/scans/' not in doc  # standalone report: no server links

@@ -1,6 +1,6 @@
 # Quick wins: verdict tooltips, scan file links, global diagram layout
 
-Status: resolved
+Status: done
 
 Vocabulary: `GLOSSARY.md` (Verdict, Scan). No dependencies on other features.
 

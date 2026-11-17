@@ -1,6 +1,6 @@
 # Global diagram layout improvement
 
-Status: resolved
+Status: wontfix
 Blocked by: –
 Spec: ../spec.md
 Type: task
@@ -24,4 +24,4 @@ Steps:
 
 ## Answer
 
-Circle seed + cose refinement in `report_graph.js`. The circle layout runs first (deterministic seed), then cose (`randomize: false, animate: false`) clusters connected zones closer. Guard `if (n > 1)` skips cose for single-zone views. `idealEdgeLength: 200` leaves room for port tags.
+Tested `cose` with the demo (5 zones): the force-directed layout compresses zones too tightly and makes the diagram less readable than the circle layout. Port tags and edges overlap. The circle layout spreads zones evenly and keeps the diagram legible at all sizes tested. Keeping `circle` as default.

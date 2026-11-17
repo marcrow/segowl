@@ -1,6 +1,6 @@
 # Clickable scan file links in detail views
 
-Status: resolved
+Status: done
 Blocked by: –
 Spec: ../spec.md
 Type: task

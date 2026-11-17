@@ -586,12 +586,9 @@ function drawZones(g) {
   cy.elements().remove();
   cy.add(zoneElements(g));
   const n = cy.nodes('.znode').length;
-  // Seed deterministic positions (sorted circle), then run cose to cluster connected zones closer.
   cy.nodes('.znode').layout({name: 'circle', fit: false, radius: Math.max(200, n * 62), startAngle: -Math.PI / 2,
     sort: (a, b) => a.id().localeCompare(b.id())}).run();
-  if (n > 1) cy.elements('.znode, .zflow').layout({name: 'cose', animate: false, randomize: false, fit: false,
-    idealEdgeLength: () => 200, nodeRepulsion: () => 8000, gravity: 0.3, numIter: 300}).run();
-  // loops point away from the centre of the layout
+  // loops point away from the centre of the circle
   const c = cy.nodes('.znode').boundingBox(), cx = (c.x1 + c.x2) / 2, cyy = (c.y1 + c.y2) / 2;
   cy.edges('.loop').forEach(e => { const p = e.source().position();
     e.style('loop-direction', (Math.atan2(p.x - cx, cyy - p.y) * 180 / Math.PI) + 'deg'); });
