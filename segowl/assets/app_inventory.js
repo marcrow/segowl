@@ -102,11 +102,49 @@ async function renameEverywhere(kind, old, nw) {
   } catch (e) { toast("Rename refused: " + e.message); H.clear(); refreshSide(); } // the row went back to its old name
 }
 
+// ---------------------------------------------------------------- tags
+const TAG_RE = /^[a-z0-9_-]{1,32}$/;
+const allTags = () => [...new Set(rows().flatMap(r => parseTags(r.tags)))].sort();
+const parseTags = v => String(v || "").split(",").map(t => t.trim()).filter(Boolean);
+const joinTags = ts => ts.join(", ");
+function tagChips(v) {
+  const ts = parseTags(v); if (!ts.length) return "";
+  return ts.map(t => `<span class="pill${TAG_RE.test(t) ? "" : " badtok"}" title="${esc(t)}">${esc(t)}</span>`).join("");
+}
+function tagEditor(cell, onRendered, success, cancel) {
+  const cur = String(cell.getValue() || "");
+  const wrap = document.createElement("span"); wrap.className = "tageditor";
+  const inp = document.createElement("input"); inp.type = "text"; inp.value = cur;
+  const dl = document.createElement("datalist"); dl.id = "tagsug_" + Math.random().toString(36).slice(2);
+  inp.setAttribute("list", dl.id);
+  wrap.append(inp, dl);
+  function updateSuggestions() {
+    const parts = inp.value.split(","), tok = parts.pop().trim().toLowerCase();
+    const have = new Set(parts.map(t => t.trim()));
+    dl.innerHTML = allTags().filter(t => !have.has(t) && t.includes(tok)).slice(0, 50)
+      .map(t => `<option value="${esc(parts.map(p => p.trim()).concat(t).join(", "))}">`).join("");
+  }
+  inp.oninput = updateSuggestions;
+  inp.onkeydown = e => { if (e.key === "Escape") cancel(); if (e.key === "Enter") { e.preventDefault(); success(normalise(inp.value)); } };
+  inp.onblur = () => success(normalise(inp.value));
+  function normalise(v) { return joinTags([...new Set(parseTags(v).map(t => t.toLowerCase()))]); }
+  onRendered(() => { inp.focus(); inp.style.width = "100%"; updateSuggestions(); });
+  return wrap;
+}
+function syncMachineTags(cell) {
+  const r = cell.getRow().getData(), machine = r.name || r.ip;
+  if (!machine) return;
+  table.getRows().forEach(row => {
+    const d = row.getData(); if (d === r) return;
+    if ((d.name || d.ip) === machine && d.tags !== r.tags) row.update({tags: r.tags});
+  });
+}
+
 // ---------------------------------------------------------------- grid
 const suggest = {zone: () => zoneNames(), type: () => [...new Set(rows().map(r => r.type).filter(Boolean))].sort(), name: () => machineNames()};
 function columns() {
   const ac = f => ({editor: "list", editorParams: {valuesLookup: suggest[f], autocomplete: true, freetext: true, allowEmpty: true, listOnEmpty: true}});
-  return [
+  const cols = [
     {title: "ip", field: "ip", width: 140, editor: "input", formatter: c => { const v = String(c.getValue() || ""), row = c.getRow().getData();
       c.getElement().classList.toggle("bad", dupSet.has(v) || (Object.values(row).some(x => x) && !ipOk(v))); return esc(v); }},
     {title: "zone", field: "zone", width: 150, ...ac("zone"), formatter: c => c.getValue() ? zoneChip(c.getValue()) : (c.getRow().getData().ip ? `<span style="color:#dc2626">— missing —</span>` : "")},
@@ -114,8 +152,10 @@ function columns() {
     {title: "name", field: "name", width: 260, ...ac("name"), formatter: c => { const n = c.getValue(), k = nameCount[n] || 0; const d = namesDns(c.getRow().getData(), SN);
       return esc(n) + (k > 1 ? ` <span class="pill" title="${k} Interfaces">${k} ifs</span>` : "")
         + (d ? `<span class="dns" title="Name from the Scans' DNS resolution: ${esc(d.fqdn)}&#10;resolved by ${esc(srcList(d.by))}&#10;Names from Scans may update it; edit it and it becomes yours.">DNS</span>` : ""); }},
-    ...D.columns.map(f => ({title: f, field: f, editor: "input", width: 130})),
+    {title: "tags", field: "tags", width: 220, editor: tagEditor, headerTooltip: "Free-form labels (e.g. windows, admin). Double-click to edit, type to add a tag to the selection. Shared across all Interfaces of a Machine.", formatter: c => tagChips(c.getValue())},
   ];
+  cols.push(...D.columns.filter(f => f !== "tags").map(f => ({title: f, field: f, editor: "input", width: 130})));
+  return cols;
 }
 const selCells = () => (table.getRanges() || []).flatMap(r => r.getCells().flat()).filter(c => c.getColumn().getField());
 const applyFilter = () => { const q = $("#q").value.toLowerCase(); table.setFilter(r => (!filterZone || r.zone === filterZone) && (!q || Object.values(r).some(v => String(v).toLowerCase().includes(q)))); };
@@ -154,6 +194,7 @@ function buildGrid() {
   let edited = null;
   table.on("cellEdited", cell => {
     if (cell.getField() === "name") machineRenamePrompt(cell);
+    if (cell.getField() === "tags") syncMachineTags(cell);
     edited ||= new Set(); edited.add(cell.getField());
     setTimeout(() => { if (!edited) return; changed(`${[...edited].join(", ")} edited`); edited = null; table.redraw(true); });
   });
@@ -190,7 +231,15 @@ function openFill(key) {
 fill.onkeydown = e => {
   if (e.key === "Escape") { fill.style.display = "none"; return; }
   if (e.key !== "Enter") return;
-  const v = fill.value; fillCells.forEach(c => c.getRow().update({[c.getColumn().getField()]: v}));
+  const v = fill.value, f0 = fillCells[0].getColumn().getField();
+  if (f0 === "tags") {
+    const tag = v.trim().toLowerCase(); if (!tag) { fill.style.display = "none"; return; }
+    fillCells.forEach(c => { const ts = parseTags(c.getRow().getData().tags); if (!ts.includes(tag)) ts.push(tag); c.getRow().update({tags: joinTags(ts)}); });
+    const machines = new Set(fillCells.map(c => { const d = c.getRow().getData(); return d.name || d.ip; }));
+    table.getRows().forEach(r => { const d = r.getData(), m = d.name || d.ip; if (!machines.has(m)) return;
+      const ref = fillCells.find(c => { const sd = c.getRow().getData(); return (sd.name || sd.ip) === m; }); if (ref && d.tags !== ref.getRow().getData().tags) r.update({tags: ref.getRow().getData().tags});
+    });
+  } else { fillCells.forEach(c => c.getRow().update({[f0]: v})); }
   fill.style.display = "none"; toast(`${fillCells.length} cells ← "${v}"`); table.redraw(true); changed(`${fillCells.length} cells filled`);
 };
 fill.onblur = () => fill.style.display = "none";
@@ -282,6 +331,50 @@ function wireToolbar() {
   $("#addcn").onblur = () => setTimeout(() => $("#addcp").hidden = true, 150);
   $("#nzb").onclick = () => { const n = $("#nz").value.trim(); if (!n || zoneNames().includes(n)) return; D.zones.push({name: n, desc: ""}); $("#nz").value = ""; changed(`Zone ${n} created`); toast(`Zone ${n} created`); };
   $("#nz").onkeydown = e => { if (e.key === "Enter") $("#nzb").click(); };
+  // bulk tag (shared by toolbar + context menu)
+  let ctxRows = null;
+  const bulkTag = (add, inputEl) => {
+    const tag = inputEl.value.trim().toLowerCase();
+    if (!TAG_RE.test(tag)) { toast("Invalid tag: lowercase, digits, _ or -, max 32 chars"); return; }
+    const sel = ctxRows || [...new Set(selCells().map(c => c.getRow()))]; ctxRows = null;
+    if (!sel.length) { toast("Select rows first"); return; }
+    sel.forEach(r => { const ts = parseTags(r.getData().tags); if (add && !ts.includes(tag)) ts.push(tag); if (!add) { const i = ts.indexOf(tag); if (i >= 0) ts.splice(i, 1); } r.update({tags: joinTags(ts)}); });
+    const machines = new Set(sel.map(r => { const d = r.getData(); return d.name || d.ip; }));
+    table.getRows().forEach(r => { const d = r.getData(), m = d.name || d.ip; if (!machines.has(m)) return; if (sel.some(s => s === r)) return;
+      const ref = sel.find(s => { const sd = s.getData(); return (sd.name || sd.ip) === m; }); if (ref) r.update({tags: ref.getData().tags});
+    });
+    table.redraw(true); changed(`tag ${tag} ${add ? "applied" : "removed"}`);
+    toast(`${add ? "Applied" : "Removed"} tag "${tag}" on ${sel.length} row(s)`);
+  };
+  const fillTagDl = dl => { dl.innerHTML = allTags().map(t => `<option value="${esc(t)}">`).join(""); };
+  // toolbar dropdown
+  $("#tagb").onclick = () => {
+    const dp = $("#tagdp"); dp.hidden = !dp.hidden; if (!dp.hidden) { fillTagDl($("#tagdl")); $("#tagv").value = ""; $("#tagv").focus(); }
+  };
+  $("#tagadd").onclick = () => { bulkTag(true, $("#tagv")); $("#tagdp").hidden = true; };
+  $("#tagrem").onclick = () => { bulkTag(false, $("#tagv")); $("#tagdp").hidden = true; };
+  $("#tagv").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); bulkTag(true, $("#tagv")); $("#tagdp").hidden = true; } if (e.key === "Escape") $("#tagdp").hidden = true; };
+  // right-click context menu
+  const ctx = document.createElement("div"); ctx.className = "drop ctxmenu"; ctx.hidden = true;
+  ctx.innerHTML = `<input type="text" placeholder="tag name" list="ctxtagdl" style="width:100%"><datalist id="ctxtagdl"></datalist>
+    <div style="margin-top:6px;display:flex;gap:6px"><button class="btn sm pri" data-ctx="add">+ Apply</button><button class="btn sm" data-ctx="rem">− Remove</button></div>`;
+  document.body.append(ctx);
+  const ctxInp = ctx.querySelector("input"), ctxDl = ctx.querySelector("datalist");
+  const closeCtx = () => { ctx.hidden = true; };
+  ctx.querySelector('[data-ctx="add"]').onclick = () => { bulkTag(true, ctxInp); closeCtx(); };
+  ctx.querySelector('[data-ctx="rem"]').onclick = () => { bulkTag(false, ctxInp); closeCtx(); };
+  ctxInp.onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); bulkTag(true, ctxInp); closeCtx(); } if (e.key === "Escape") closeCtx(); };
+  document.getElementById("grid").addEventListener("contextmenu", e => {
+    const cell = e.target.closest('[tabulator-field="tags"]'); if (!cell) return;
+    e.preventDefault();
+    const clickedRow = table.getRows().find(r => r.getElement().contains(cell));
+    const selRows = [...new Set(selCells().map(c => c.getRow()))];
+    ctxRows = (clickedRow && !selRows.includes(clickedRow)) ? [clickedRow] : null;
+    fillTagDl(ctxDl); ctxInp.value = "";
+    Object.assign(ctx.style, {position: "fixed", left: e.clientX + "px", top: e.clientY + "px"});
+    ctx.hidden = false; setTimeout(() => ctxInp.focus(), 0);
+  });
+  document.addEventListener("mousedown", e => { if (!ctx.hidden && !ctx.contains(e.target)) closeCtx(); });
   $("#dl").onclick = async e => { if (dirty) { e.preventDefault(); try { await flush(); location.href = "/api/file/inventory.csv"; } catch (err) { toast(err.message); } } };
   $("#izf").onchange = async () => {
     const f = $("#izf").files[0]; $("#izf").value = ""; if (!f) return;
@@ -389,6 +482,7 @@ function applyNames(p, own) {
 // ---------------------------------------------------------------- boot
 (async () => {
   try { D = await api("/api/inventory"); } catch (e) { status("Cannot load: " + e.message, "err"); return; }
+  if (!D.columns.includes("tags")) D.columns.unshift("tags");
   SN = await api("/api/scan-names").catch(() => null);
   buildGrid(); wireToolbar();
   $("#npb").onclick = openNames;

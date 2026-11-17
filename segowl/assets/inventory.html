@@ -26,7 +26,13 @@ cell. Drag the <span style="display:inline-block;width:9px;height:9px;background
         style="width:250px;padding:8px"><input type="text" id="addcn" placeholder="column name, e.g. os"
         style="width:100%"><span class="small muted"><span class="kbd">Enter</span> add ·
         <span class="kbd">Esc</span> cancel</span></span></span>
-      <button class="btn" id="delr">Delete selected rows</button><span class="sep"></span>
+      <button class="btn" id="delr">Delete selected rows</button>
+      <span class="palette" id="tagop"><button class="btn" id="tagb">Tag ▾</button><span class="drop" id="tagdp" hidden
+        style="width:280px;padding:8px"><input type="text" id="tagv" placeholder="tag name, e.g. windows" list="tagdl"
+        style="width:100%"><datalist id="tagdl"></datalist><div style="margin-top:6px;display:flex;gap:6px">
+        <button class="btn sm pri" id="tagadd">+ Apply to selected</button>
+        <button class="btn sm" id="tagrem">− Remove from selected</button></div>
+        <span class="small muted"><span class="kbd">Enter</span> apply · <span class="kbd">Esc</span> cancel</span></span></span><span class="sep"></span>
       <button class="btn" id="npb" title="Fill the empty names (and the names marked DNS) from the names the Scans resolved">⇄ Names from Scans</button><span class="sep"></span>
       <a class="btn" id="dl" href="/api/file/inventory.csv">Download CSV</a>
       <label class="btn">Upload CSV…<input type="file" id="upf" accept=".csv,.txt" hidden></label>
