@@ -1,6 +1,6 @@
 // SegOWL — Auditor Kits page (ticket 06). The server does every file operation (segowl/kits.py).
 "use strict";
-const SHORT = {"port_groups.csv": "Port Groups", "scan_profiles.csv": "Scan Profiles", "port_labels.csv": "Port Labels"};
+const SHORT = {"port_groups.csv": "Port Groups", "scan_profiles.csv": "Scan Profiles", "port_labels.csv": "Port Labels", "automations.ini": "Automations"};
 const rows = text => text.split(/\r?\n/).slice(1).filter(l => l.trim() && !l.startsWith("#")).length;
 
 let D = null, open = null, zip = null;
@@ -15,7 +15,7 @@ function draw() {
     || `<tr><td class="muted">No kit yet.</td></tr>`;
   const dirs = D.dirs.map(d => `<option>${esc(d)}</option>`).join("");
   document.querySelectorAll(".kd").forEach(s => { const v = s.value; s.innerHTML = dirs || `<option value="">add a kit folder first</option>`; if (D.dirs.includes(v)) s.value = v; });
-  $("#mfiles").innerHTML = "This Mission has: " + (D.mission.map(n => `<code>${n}</code>`).join(", ") || "none of the three files (it uses the shipped defaults)");
+  $("#mfiles").innerHTML = "This Mission has: " + (D.mission.map(n => `<code>${n}</code>`).join(", ") || "none of the kit files (it uses the shipped defaults)");
   $("#dl").innerHTML = D.dirs.map((d, i) => `<div class="rule"><code style="flex:1">${esc(d)}</code><span class="x muted" data-rmdir="${i}" title="Forget this folder (its files stay)">✕</span></div>`).join("")
     || `<div class="small muted">None yet: add one to save or import kits.</div>`;
 }

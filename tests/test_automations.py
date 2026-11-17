@@ -336,6 +336,43 @@ def test_derived_tags_available_in_analysis():
 # ---------------------------------------------------------------- app: Automations CRUD
 
 
+# ---------------------------------------------------------------- kit: portable automations only
+
+
+def test_kit_saves_only_portable_automations(tmp_path):
+    from segowl.kits import save_kit, read_dirs
+    mission = tmp_path / "mission"
+    shutil.copytree(MISSION, mission)
+    # Create automations: one portable, one not
+    save_automations(
+        mission / "automations.ini",
+        [
+            Automation("web", "tag", "port = 80 or port = 443", "web_server"),
+            Automation("admin-noise", "exclude", "state = closed and zone = Admin"),
+        ],
+    )
+    kit_dir = tmp_path / "kits"
+    kit_dir.mkdir()
+    save_kit(mission, [kit_dir], kit_dir, "test-kit")
+    kit_autos = load_automations(kit_dir / "test-kit" / "automations.ini")
+    assert len(kit_autos) == 1
+    assert kit_autos[0].name == "web"  # portable: only port and state
+
+
+def test_kit_no_automations_when_all_non_portable(tmp_path):
+    from segowl.kits import save_kit
+    mission = tmp_path / "mission"
+    shutil.copytree(MISSION, mission)
+    save_automations(
+        mission / "automations.ini",
+        [Automation("zone-only", "exclude", "zone = Admin")],
+    )
+    kit_dir = tmp_path / "kits"
+    kit_dir.mkdir()
+    save_kit(mission, [kit_dir], kit_dir, "test-kit")
+    assert not (kit_dir / "test-kit" / "automations.ini").exists()
+
+
 def test_automations_crud_via_mission(tmp_path):
     from segowl.app import Mission
     m = tmp_path / "mission"

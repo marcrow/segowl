@@ -187,6 +187,11 @@ class Automation:
     condition: str
     tag: str = ""  # only for action=tag
 
+    @property
+    def fields_used(self) -> set[str]:
+        _, fields = parse_condition(self.condition)
+        return fields
+
     def safe_name(self) -> str:
         return html.escape(self.name)
 

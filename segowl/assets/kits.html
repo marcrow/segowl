@@ -1,7 +1,7 @@
 <!-- SegOWL — Auditor Kits page body (ticket 06), wrapped by app.page(). -->
 <main>
-<p class="sub">A kit carries your Port Groups, Scan Profiles and Port Labels from Mission to Mission: only
-<code>port_groups.csv</code>, <code>scan_profiles.csv</code> and <code>port_labels.csv</code>, never client data. Applying
+<p class="sub">A kit carries your Port Groups, Scan Profiles, Port Labels and portable Automations from Mission to Mission: only
+<code>port_groups.csv</code>, <code>scan_profiles.csv</code>, <code>port_labels.csv</code> and <code>automations.ini</code>, never client data. Applying
 a kit shows a row-by-row diff with the Mission; you pick which of its files replace the Mission's, the others stay as
 they are.</p>
 <div id="msg"></div>
@@ -13,7 +13,7 @@ they are.</p>
       in <select id="sd" class="kd" style="max-width:240px"></select><button class="btn pri" id="sb">Save</button></div>
     <div id="sres"></div></div>
   <div class="card"><b>Import a kit zip</b>
-    <div class="small muted" style="margin:4px 0 8px">Only the three kit files are read from the zip, at its root or in one folder.</div>
+    <div class="small muted" style="margin:4px 0 8px">Only kit files are read from the zip, at its root or in one folder.</div>
     <div class="toolbar"><label class="btn">Choose a zip…<input type="file" id="izf" accept=".zip" hidden></label>
       <input type="text" id="in" placeholder="kit name" style="width:150px"> in <select id="id" class="kd" style="max-width:200px"></select>
       <button class="btn pri" id="ib" disabled>Import</button></div>

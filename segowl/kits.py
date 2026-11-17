@@ -22,7 +22,7 @@ from segowl import scan_profiles as sp
 from segowl.port_groups import load_port_groups
 from segowl.scan_profiles import NAME_RE
 
-FILES = ("port_groups.csv", "scan_profiles.csv", "port_labels.csv")
+FILES = ("port_groups.csv", "scan_profiles.csv", "port_labels.csv", "automations.ini")
 SHIPPED = Path(__file__).resolve().parent / "kits"
 
 
@@ -67,12 +67,34 @@ def _new_kit(dirs: list[Path], kit_dir: Path, name: str, overwrite: bool) -> Pat
     return path
 
 
+def _save_portable_automations(mission: Path, kit: Path) -> None:
+    """Copy only portable Automations from the Mission to the kit."""
+    src = mission / "automations.ini"
+    if not src.is_file():
+        (kit / "automations.ini").unlink(missing_ok=True)
+        return
+    from segowl.automations import is_portable, load_automations, save_automations
+    try:
+        autos = load_automations(src)
+    except ValueError:
+        (kit / "automations.ini").unlink(missing_ok=True)
+        return
+    portable = [a for a in autos if is_portable(a.fields_used)]
+    if portable:
+        kit.mkdir(parents=True, exist_ok=True)
+        save_automations(kit / "automations.ini", portable)
+    else:
+        (kit / "automations.ini").unlink(missing_ok=True)
+
+
 def save_kit(mission: Path, dirs: list[Path], kit_dir: Path, name: str, overwrite: bool = False) -> Path:
     path = _new_kit(dirs, kit_dir, name, overwrite)
+    csv_files = [n for n in FILES if n != "automations.ini"]
     if not any((mission / n).is_file() for n in FILES):
         raise ValueError(f"Nothing to save: the Mission has none of {', '.join(FILES)}")
-    _copy(mission, path)
-    for n in FILES:  # an overwritten kit mirrors the Mission
+    _copy(mission, path, csv_files)
+    _save_portable_automations(mission, path)
+    for n in csv_files:  # an overwritten kit mirrors the Mission
         if not (mission / n).is_file():
             (path / n).unlink(missing_ok=True)
     return path
@@ -85,6 +107,16 @@ def _table(path: Path) -> dict[str, str]:
     return {" ".join(row[:k]): ";".join(row[k:]) for row in rows}
 
 
+def _ini_table(path: Path) -> dict[str, str]:
+    """An automations.ini as {section name: "action condition [tag]"} for kit-level diff."""
+    if not path.is_file():
+        return {}
+    import configparser
+    cp = configparser.ConfigParser(interpolation=None)
+    cp.read(path, encoding="utf-8")
+    return {name: f"{cp[name].get('action','')} {cp[name].get('condition','')}" for name in cp.sections()}
+
+
 def diff(mission: Path, kit: Path) -> dict[str, dict]:
     """Per kit file: absent (not in the kit), same, new (the Mission has none) or changed, with the rows."""
     out: dict[str, dict] = {}
@@ -93,7 +125,8 @@ def diff(mission: Path, kit: Path) -> dict[str, dict]:
         if not new.is_file():
             out[n] = {"status": "absent"}
             continue
-        a, b = _table(old), _table(new)
+        tbl = _ini_table if n.endswith(".ini") else _table
+        a, b = tbl(old), tbl(new)
         if old.is_file() and old.read_bytes() == new.read_bytes():
             status = "same"
         else:
