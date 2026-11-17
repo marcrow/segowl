@@ -61,10 +61,7 @@
 </div>
 </main>
 <script>
-const $ = s => document.querySelector(s);
-const esc = t => { const d = document.createElement("div"); d.textContent = t; return d.innerHTML; };
-const api = (url, body) => fetch(url, {method: body !== undefined ? "POST" : "GET", headers: {"X-SegOWL": "1", "Content-Type": "application/json"}, body: body !== undefined ? JSON.stringify(body) : undefined}).then(r => r.json());
-const toast = msg => { const t = document.getElementById("toast"); t.textContent = msg; t.style.opacity = 1; setTimeout(() => t.style.opacity = 0, 2500); };
+// $, esc, api, toast are defined in app_common.js (loaded first by app.page())
 
 let D = {fp: "", automations: []}, CTX = {zones: [], machines: [], tags: []};
 let editing = null; // index in D.automations, or null for new
@@ -217,7 +214,11 @@ function syncTextToVisual() {
   $("#clauses").innerHTML = "";
   const text = $("#acond").value.trim();
   if (!text) { addClause("port", "=", ""); return; }
-  // simple parse: split on and/or, each part is field op value
+  if (/[()]/.test(text)) {
+    toast("Parenthesised conditions: use text mode to edit, or remove the parentheses");
+    $("#totext").click();
+    return;
+  }
   const tokens = text.match(/(?:"[^"]*"|[^\s])+/g) || [];
   let i = 0, first = true;
   while (i < tokens.length) {

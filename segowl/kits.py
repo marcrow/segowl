@@ -1,9 +1,9 @@
-"""Auditor Kits: a folder holding at most port_groups.csv, scan_profiles.csv and port_labels.csv (GLOSSARY).
+"""Auditor Kits: reusable config (Port Groups, Scan Profiles, Port Labels, portable Automations).
 
-A kit never holds client data, by construction: only these three files are ever read or written, and
+A kit never holds client data, by construction: only the kit files are ever read or written, and
 Scan Profiles refuse the options that would carry targets (scan_profiles.DENIED). Applying a kit copies
 the files the auditor picks, after a row-level diff; a file the kit lacks or that is not picked is left
-as it is in the Mission.
+as it is in the Mission. Automations are merged (new sections added, existing kept).
 
 Kit folders: the shipped one (read-only) and the folders listed in <config>/kit_dirs, one per line;
 every sub-folder of a kit folder is a kit.
@@ -140,6 +140,20 @@ def diff(mission: Path, kit: Path) -> dict[str, dict]:
     return out
 
 
+def _merge_automations(mission: Path, kit: Path) -> None:
+    """Merge kit's portable Automations into the Mission's file, adding only new sections."""
+    kit_ini = kit / "automations.ini"
+    if not kit_ini.is_file():
+        return
+    from segowl.automations import load_automations, save_automations
+    kit_autos = load_automations(kit_ini)
+    mission_ini = mission / "automations.ini"
+    existing = load_automations(mission_ini) if mission_ini.is_file() else []
+    names = {a.name for a in existing}
+    merged = list(existing) + [a for a in kit_autos if a.name not in names]
+    save_automations(mission_ini, merged)
+
+
 def apply_kit(
     mission: Path, dirs: list[Path], kit_dir: Path, name: str, files=None, dry: bool = False
 ) -> dict:
@@ -154,16 +168,22 @@ def apply_kit(
     unknown = [n for n in files if n not in FILES or not (kit / n).is_file()]
     if unknown:
         raise ValueError(f"Not in kit {name}: {', '.join(unknown)}")
+    csv_files = [n for n in files if n != "automations.ini"]
+    has_auto = "automations.ini" in files
     with tempfile.TemporaryDirectory() as tmp:  # the Mission's config as it would be after the apply
         _copy(mission, Path(tmp))
-        _copy(kit, Path(tmp), files)
+        _copy(kit, Path(tmp), csv_files)
+        if has_auto:
+            _merge_automations(Path(tmp), kit)
         errors = check(Path(tmp))
     if not dry:
         if not files:
             raise ValueError("Choose at least one kit file to apply")
         if errors:
             raise ValueError("; ".join(errors))
-        _copy(kit, mission, files)
+        _copy(kit, mission, csv_files)
+        if has_auto:
+            _merge_automations(mission, kit)
     return {"diff": diff(mission, kit), "errors": errors}
 
 
@@ -204,7 +224,15 @@ def check(folder: Path) -> list[str]:
         if (folder / "scan_profiles.csv").is_file()
         else ""
     )
-    return [f"Scan Profile {e}" for p in sp.read_profiles(text) for e in sp.validate(p, groups)]
+    errors = [f"Scan Profile {e}" for p in sp.read_profiles(text) for e in sp.validate(p, groups)]
+    auto_file = folder / "automations.ini"
+    if auto_file.is_file():
+        from segowl.automations import load_automations
+        try:
+            load_automations(auto_file)
+        except ValueError as e:
+            errors.append(str(e).replace(str(folder) + os.sep, ""))
+    return errors
 
 
 def zip_files(files: dict[str, Path]) -> bytes:

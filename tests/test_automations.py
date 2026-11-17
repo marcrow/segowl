@@ -129,6 +129,23 @@ def test_parenthesised_or():
     assert not pred(_obs(port=22, state="open"))
 
 
+def test_state_filtered_matches_compound_states():
+    pred, _ = parse_condition("state = filtered")
+    assert pred(_obs(state="filtered"))
+    assert pred(_obs(state="open|filtered"))
+    assert pred(_obs(state="closed|filtered"))
+    assert not pred(_obs(state="open"))
+    assert not pred(_obs(state="closed"))
+
+
+def test_state_not_filtered_excludes_compound_states():
+    pred, _ = parse_condition("state != filtered")
+    assert not pred(_obs(state="filtered"))
+    assert not pred(_obs(state="open|filtered"))
+    assert pred(_obs(state="open"))
+    assert pred(_obs(state="closed"))
+
+
 def test_quoted_value():
     pred, _ = parse_condition('zone = "Server Room"')
     assert pred(_obs(zone="Server Room"))
@@ -238,6 +255,25 @@ def test_open_state_exclusion_warns():
 
 
 # ---------------------------------------------------------------- engine: grouped ports
+
+
+def test_port_specific_exclusion_does_not_drop_grouped():
+    """port = 22 and state = closed must NOT exclude a grouped 'closed 1-1024' range."""
+    inv = load_inventory(str(MISSION / "inventory.csv"))
+    scans = {"172.31.250.1": [Scan(
+        path="x.xml", source="172.31.250.1",
+        hosts={
+            "172.31.250.10": HostRecord(
+                state="up",
+                ports=[(22, "tcp", "closed"), (80, "tcp", "open")],
+                rest=[("tcp", [(1, 1024)], "closed")],
+            ),
+        },
+    )]}
+    autos = [Automation("ssh-only", "exclude", "port = 22 and state = closed")]
+    result = run_automations(autos, inv, scans)
+    assert ("172.31.250.1", "172.31.250.10", 22, "tcp") in result.excluded
+    assert ("172.31.250.1", "172.31.250.10", "tcp") not in result.excluded_grouped
 
 
 def test_exclude_matches_grouped_ports():

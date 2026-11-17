@@ -138,8 +138,13 @@ def _comparison(f: str, op: str, val: str):
         v = val.lower()
         if v not in STATES:
             raise ParseError(f"state must be one of {STATES}, got {val!r}")
+        # "filtered" also matches "open|filtered" and "closed|filtered" (spec / verdict.py)
         if op == "=":
+            if v == "filtered":
+                return lambda obs: obs["state"] in ("filtered", "open|filtered", "closed|filtered")
             return lambda obs, _v=v: obs["state"] == _v
+        if v == "filtered":
+            return lambda obs: obs["state"] not in ("filtered", "open|filtered", "closed|filtered")
         return lambda obs, _v=v: obs["state"] != _v
     if f == "protocol":
         v = val.lower()

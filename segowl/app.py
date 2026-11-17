@@ -171,7 +171,7 @@ class Mission:
 
     # ---- inventory editor
     def fps(self) -> dict[str, str]:
-        return {n: fingerprint(self.file(n)) for n in ("inventory.csv", "zones.csv", "flow_policy.csv")}
+        return {n: fingerprint(self.file(n)) for n in ("inventory.csv", "zones.csv", "flow_policy.csv", "automations.ini")}
 
     def inventory(self) -> dict:
         free, rows = mf.read_inventory(self.text("inventory.csv"))
@@ -640,6 +640,11 @@ class Mission:
             if action not in ("tag", "exclude"):
                 errors.append(f"{name}: action must be tag or exclude")
                 continue
+            if action == "tag":
+                from segowl.automations import TAG_RE
+                if not tag or not TAG_RE.match(tag):
+                    errors.append(f"{name}: tag action requires a valid tag name ([a-z0-9_-])")
+                    continue
             try:
                 parse_condition(condition)
             except ParseError as e:
