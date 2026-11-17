@@ -77,6 +77,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--cyan2);border-co
 .res .pill{font-size:10.5px;padding:0 6px}
 .drop{right:0;max-height:360px;overflow:auto}
 .pill.udp{background:#fff3d6;color:#7a4a00}.pill.grp{background:#d8f6ff;color:#004f66;font-weight:600}
+.pill.auto{background:#e8f5e9;color:#2e7d32;border:1px dashed #81c784;font-style:italic}
 .pill.admin{box-shadow:inset 3px 0 0 var(--red)}
 pre.cmd{background:var(--navy);color:#e6f7ff;border-radius:8px;padding:12px;font-size:12px;white-space:pre-wrap;word-break:break-all;margin:4px 0 8px}
 .tokenline{display:flex;flex-wrap:wrap;gap:6px;align-items:center;background:var(--navy);border-radius:10px;padding:12px;min-height:56px}

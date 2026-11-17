@@ -175,13 +175,17 @@ class Mission:
 
     def inventory(self) -> dict:
         free, rows = mf.read_inventory(self.text("inventory.csv"))
-        return {
+        d = {
             "fp": self.fps(),
             "columns": free,
             "rows": rows,
             "zones": mf.read_zones(self.text("zones.csv")),
             "refs": dict(mf.policy_refs(self.text("flow_policy.csv"))),
         }
+        dt = self._derived_tags()
+        if dt:
+            d["derived_tags"] = dt
+        return d
 
     def save_inventory(self, data: dict) -> dict:
         free = [str(c).strip() for c in data.get("columns", []) if str(c).strip()]
@@ -608,6 +612,35 @@ class Mission:
         raise ValueError(f"Unknown kit action {action}")
 
     # ---- Automations
+    def _derived_tags(self) -> dict[str, list[str]]:
+        """Compute derived tags from automations without regenerating the full report."""
+        path = self.file("automations.ini")
+        if not path.is_file():
+            return {}
+        try:
+            autos = load_automations(path)
+        except ValueError:
+            return {}
+        tag_autos = [a for a in autos if a.action == "tag"]
+        if not tag_autos:
+            return {}
+        try:
+            inv = load_inventory(str(self.file("inventory.csv")))
+        except SystemExit:
+            return {}
+        if not self.file("scans").is_dir():
+            return {}
+        from segowl.automations import extract_observations, run_automations
+        from segowl.nmap import discover_scans, parse_scan
+        scans_dict = {}
+        for src, paths in discover_scans(str(self.file("scans"))).items():
+            if src in inv:
+                scans_dict[src] = [parse_scan(p, src) for p in paths]
+        if not scans_dict:
+            return {}
+        result = run_automations(autos, inv, scans_dict)
+        return {m: sorted(tags) for m, tags in result.derived_tags.items()}
+
     def automations(self) -> dict:
         path = self.file("automations.ini")
         try:

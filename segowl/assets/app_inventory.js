@@ -107,9 +107,12 @@ const TAG_RE = /^[a-z0-9_-]{1,32}$/;
 const allTags = () => [...new Set(rows().flatMap(r => parseTags(r.tags)))].sort();
 const parseTags = v => String(v || "").split(",").map(t => t.trim()).filter(Boolean);
 const joinTags = ts => ts.join(", ");
-function tagChips(v) {
-  const ts = parseTags(v); if (!ts.length) return "";
-  return ts.map(t => `<span class="pill${TAG_RE.test(t) ? "" : " badtok"}" title="${esc(t)}">${esc(t)}</span>`).join("");
+function tagChips(v, machine) {
+  const manual = parseTags(v);
+  const auto = (D && D.derived_tags && machine) ? (D.derived_tags[machine] || []).filter(t => !manual.includes(t)) : [];
+  if (!manual.length && !auto.length) return "";
+  return manual.map(t => `<span class="pill${TAG_RE.test(t) ? "" : " badtok"}" title="${esc(t)}">${esc(t)}</span>`).join("")
+    + auto.map(t => `<span class="pill auto" title="${esc(t)} (derived from Automations)">${esc(t)}</span>`).join("");
 }
 function tagEditor(cell, onRendered, success, cancel) {
   const cur = String(cell.getValue() || "");
@@ -152,7 +155,7 @@ function columns() {
     {title: "name", field: "name", width: 260, ...ac("name"), formatter: c => { const n = c.getValue(), k = nameCount[n] || 0; const d = namesDns(c.getRow().getData(), SN);
       return esc(n) + (k > 1 ? ` <span class="pill" title="${k} Interfaces">${k} ifs</span>` : "")
         + (d ? `<span class="dns" title="Name from the Scans' DNS resolution: ${esc(d.fqdn)}&#10;resolved by ${esc(srcList(d.by))}&#10;Names from Scans may update it; edit it and it becomes yours.">DNS</span>` : ""); }},
-    {title: "tags", field: "tags", width: 220, editor: tagEditor, headerTooltip: "Free-form labels (e.g. windows, admin). Double-click to edit, type to add a tag to the selection. Shared across all Interfaces of a Machine.", formatter: c => tagChips(c.getValue())},
+    {title: "tags", field: "tags", width: 220, editor: tagEditor, headerTooltip: "Free-form labels (e.g. windows, admin). Double-click to edit, type to add a tag to the selection. Shared across all Interfaces of a Machine.", formatter: c => { const d = c.getRow().getData(); return tagChips(c.getValue(), d.name || d.ip); }},
   ];
   cols.push(...D.columns.filter(f => f !== "tags").map(f => ({title: f, field: f, editor: "input", width: 130})));
   return cols;
