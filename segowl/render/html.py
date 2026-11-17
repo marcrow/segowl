@@ -84,7 +84,8 @@ MARK = {
     ALIVE: "ping",
     BLOCK: "×",
     NODATA: "–",
-}  # BLOCKED tested and blocked, UNSEEN never seen
+    EXCLUDED: "⊘",
+}  # BLOCKED tested and blocked, UNSEEN never seen, EXCLUDED all observations removed by Automations
 
 
 def _pg(st: str | None) -> str:
@@ -164,7 +165,7 @@ def _zone_matrix_html(
         for zd in zones:
             a = agg.get((zs, zd)) or ZoneAgg()
             st = (status or {}).get((zs, zd))
-            txt = _ports_html(a.open_ports, highlight, cap=6) if a.verdict == OPEN else MARK[a.verdict]
+            txt = _ports_html(a.open_ports, highlight, cap=6) if a.verdict == OPEN else MARK.get(a.verdict, "")
             pairs = (
                 f'<small class="pairs">{a.pass_pairs}/{a.total_pairs} pairs</small>'
                 if a.verdict >= ALIVE

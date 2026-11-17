@@ -131,9 +131,10 @@ def _comparison(f: str, op: str, val: str):
             raise ParseError(f"port must be an integer, got {val!r}") from None
         if not 1 <= pval <= 65535:
             raise ParseError(f"port must be 1–65535, got {pval}")
+        # grouped-port observations (port=0 sentinel) never match a port comparison
         if op == "=":
             return lambda obs, _v=pval: obs["port"] == _v
-        return lambda obs, _v=pval: obs["port"] != _v
+        return lambda obs, _v=pval: obs["port"] != 0 and obs["port"] != _v
     if f == "state":
         v = val.lower()
         if v not in STATES:

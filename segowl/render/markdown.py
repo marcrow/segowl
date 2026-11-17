@@ -37,7 +37,7 @@ def write_host_matrix_md(matrix: Matrix, inv: Inventory, out_dir: str) -> None:
         "# Consolidated host -> host matrix",
         "",
         "Legend: `OPEN`=service reachable | `o`=reachable (closed) | `~`=alive (ping/ARP) | "
-        "`x`=blocked | `.`=unseen | `-`=same machine",
+        "`x`=blocked | `.`=unseen | `⊘`=excluded by Automations | `-`=same machine",
         "",
         "| source \\ target | " + " | ".join(inv[d].short for d in dsts) + " |",
         "|" + "---|" * (len(dsts) + 1),

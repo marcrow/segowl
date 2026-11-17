@@ -257,6 +257,14 @@ def test_open_state_exclusion_warns():
 # ---------------------------------------------------------------- engine: grouped ports
 
 
+def test_port_not_equal_does_not_match_grouped_observations():
+    """port != 22 must NOT match grouped-port observations (port=0 sentinel)."""
+    pred, _ = parse_condition("port != 22")
+    assert pred(_obs(port=80))
+    assert not pred(_obs(port=22))
+    assert not pred(_obs(port=0))  # grouped sentinel
+
+
 def test_port_specific_exclusion_does_not_drop_grouped():
     """port = 22 and state = closed must NOT exclude a grouped 'closed 1-1024' range."""
     inv = load_inventory(str(MISSION / "inventory.csv"))
