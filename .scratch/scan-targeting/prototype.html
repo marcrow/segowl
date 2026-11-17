@@ -66,6 +66,8 @@ table.grid td.todo{background:#fbfcfe;color:#9aa3b2;text-align:center}
 .tgt-checks{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
 .tgt-checks label{cursor:pointer;display:inline-flex;align-items:center;gap:3px;font-size:13px;padding:2px 0}
 .tgt-checks label input[type=checkbox]{margin:0;accent-color:var(--cyan)}
+.tgt-combine{display:flex;align-items:center;gap:8px;margin:4px 0 4px 56px}
+.tgt-combine-hint{font-style:italic}
 .tgt-count{display:flex;align-items:baseline;gap:6px;margin-top:6px;font-size:13px}
 .tgt-count .n{font-size:17px;font-weight:700;color:var(--navy)}
 .tgt-count .active{color:var(--cyan)}
@@ -133,17 +135,19 @@ and drop the results on its row.</p>
       <b>Targeting</b>
       <span class="small muted">which Machines this profile scans — saved with the profile</span>
       <span id="tgt-badge"></span>
-      <span style="margin-left:auto">
-        <span class="seg" id="combine">
-          <button class="on" data-v="or">OR</button>
-          <button data-v="and">AND</button>
-        </span>
-      </span>
     </div>
 
     <div class="tgt-row">
       <span class="lbl">Zones</span>
       <div class="tgt-checks" id="zone-checks"></div>
+    </div>
+
+    <div class="tgt-combine">
+      <span class="seg" id="combine" title="How Zones and Tags combine: OR includes a Machine that matches either; AND requires both a Zone and a Tag to match">
+        <button class="on" data-v="or">OR</button>
+        <button data-v="and">AND</button>
+      </span>
+      <span class="small muted tgt-combine-hint">between Zones and Tags</span>
     </div>
 
     <div class="tgt-row">
