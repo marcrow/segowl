@@ -12,7 +12,7 @@ from segowl.nmap import HostRecord, Scan
 from segowl.policy import DENY, UNDECLARED, Rule, decide, worst
 from segowl.port_groups import HIGHLIGHT, PortGroups
 from segowl.ports import Port, in_port_set, merge_ranges, overlaps
-from segowl.verdict import ALIVE, BLOCK, NODATA, OPEN, REACH, Cell, classify
+from segowl.verdict import ALIVE, BLOCK, EXCLUDED, NODATA, OPEN, REACH, Cell, classify
 
 Row = dict[str, Cell]  # target ip -> verdict cell
 Matrix = dict[str, Row]  # source ip -> row
@@ -224,6 +224,8 @@ class Analysis:
     policy: list[Rule] | None = None  # None = no Flow Policy: no Findings, no policy colouring
     excluded: dict[str, list[str]] = field(default_factory=dict)  # source ip -> parked scan files, not read
     labels: list[tuple[str, ...]] = field(default_factory=list)  # Port Labels (scan_profiles.load_labels)
+    derived_tags: dict[str, set[str]] = field(default_factory=dict)  # machine -> derived tags from Automations
+    automation_warnings: list[str] = field(default_factory=list)  # warnings from Automation evaluation
 
     @property
     def sources(self) -> list[str]:
@@ -321,13 +323,30 @@ def analyze(
     excluded: dict[str, list[str]] | None = None,
     declared: list[str] | None = None,
     labels: list[tuple[str, ...]] | None = None,
+    automations: list | None = None,
 ) -> Analysis:
     """declared: the Sources the Mission declares (nmap.discover_declared); those without a Scan are a gap."""
     scans = {src: sorted(v, key=lambda sc: (sc.start_ts, sc.name)) for src, v in scans.items()}
-    matrix, unknown, pn_count = build_matrix(inv, scans, force_pn)
+    derived_tags: dict[str, set[str]] = {}
+    auto_warnings: list[str] = []
+    effective_scans = scans
+    if automations:
+        from segowl.automations import filter_scans, had_observations, run_automations
+        result = run_automations(automations, inv, scans)
+        derived_tags = result.derived_tags
+        auto_warnings = result.warnings
+        had_obs = had_observations(scans, inv)
+        effective_scans = filter_scans(scans, result)
+    matrix, unknown, pn_count = build_matrix(inv, effective_scans, force_pn)
+    # EXCLUDED verdict: pairs that had observations but now classify as NODATA
+    if automations:
+        for s, row in matrix.items():
+            for d, c in row.items():
+                if c.verdict <= NODATA and (s, d) in had_obs:
+                    c.verdict = EXCLUDED
     return Analysis(
         inv=inv,
-        scans=scans,
+        scans=effective_scans,
         orphan=orphan,
         matrix=matrix,
         missing=sorted(set(declared or []) - set(scans)),
@@ -340,4 +359,6 @@ def analyze(
         policy=policy,
         excluded=excluded or {},
         labels=labels or [],
+        derived_tags=derived_tags,
+        automation_warnings=auto_warnings,
     )

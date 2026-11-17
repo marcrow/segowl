@@ -41,6 +41,7 @@ from segowl.port_groups import DEFAULTS as GROUP_DEFAULTS
 from segowl.port_groups import load_port_groups
 from segowl.ports import parse_port_set
 from segowl.scan_profiles import NAME_RE
+from segowl.automations import Automation, load_automations, parse_condition, save_automations, ParseError
 from segowl.verdict import ALIVE, VERDICT_NAME, classify
 
 ASSETS = Path(__file__).parent / "assets"
@@ -606,6 +607,88 @@ class Mission:
                 return {**self.kits(), "message": f"Kit {name} imported"}
         raise ValueError(f"Unknown kit action {action}")
 
+    # ---- Automations
+    def automations(self) -> dict:
+        path = self.file("automations.ini")
+        try:
+            autos = load_automations(path)
+        except ValueError as e:
+            return {"fp": fingerprint(path), "automations": [], "error": str(e)}
+        return {
+            "fp": fingerprint(path),
+            "automations": [
+                {"name": a.name, "action": a.action, "condition": a.condition, "tag": a.tag}
+                for a in autos
+            ],
+        }
+
+    def save_automations(self, data: dict) -> dict:
+        raw = data.get("automations", [])
+        autos = []
+        errors = []
+        for r in raw:
+            name = str(r.get("name", "")).strip()
+            action = str(r.get("action", "")).strip().lower()
+            condition = str(r.get("condition", "")).strip()
+            tag = str(r.get("tag", "")).strip()
+            if not name:
+                errors.append("missing name")
+                continue
+            if "\n" in name or "]" in name or "[" in name:
+                errors.append(f"{name}: invalid characters in name")
+                continue
+            if action not in ("tag", "exclude"):
+                errors.append(f"{name}: action must be tag or exclude")
+                continue
+            try:
+                parse_condition(condition)
+            except ParseError as e:
+                errors.append(f"{name}: {e}")
+                continue
+            autos.append(Automation(name, action, condition, tag))
+        if errors:
+            raise ValueError("; ".join(errors))
+        names = [a.name for a in autos]
+        dupes = sorted({n for n in names if names.count(n) > 1})
+        if dupes:
+            raise ValueError(f"duplicate name(s): {', '.join(dupes)}")
+        path = self.file("automations.ini")
+        with LOCK:
+            check_fingerprints({path: data.get("fp", "")})
+            save_automations(path, autos)
+            return {"fp": fingerprint(path)}
+
+    def test_automation(self, data: dict) -> dict:
+        """Evaluate a condition against current scan data: match count and affected machines."""
+        condition = str(data.get("condition", "")).strip()
+        try:
+            pred, _ = parse_condition(condition)
+        except ParseError as e:
+            return {"error": str(e)}
+        from segowl.automations import extract_observations
+        try:
+            inv = load_inventory(str(self.file("inventory.csv")))
+        except SystemExit:
+            return {"error": "inventory error"}
+        scans_dict = {}
+        if self.file("scans").is_dir():
+            from segowl.nmap import discover_scans, parse_scan
+            for src, paths in discover_scans(str(self.file("scans"))).items():
+                if src in inv:
+                    scans_dict[src] = [parse_scan(p, src) for p in paths]
+        obs = extract_observations(inv, scans_dict)
+        matches = [o for o in obs if pred(o)]
+        machines = sorted({o["machine"] for o in matches})
+        return {"matches": len(matches), "machines": machines}
+
+    def automation_context(self) -> dict:
+        """Autocomplete data for the Automations editor."""
+        rows = self.rows()
+        zones = sorted({r.get("zone", "") for r in rows if r.get("zone")})
+        machines = sorted({r.get("name") or r["ip"] for r in rows})
+        tags = sorted({t for r in rows for t in (r.get("tags") or "").split(",") if t.strip()})
+        return {"zones": zones, "machines": machines, "tags": tags}
+
     # ---- Sources, targets, Scans
     def rows(self) -> list[dict]:
         return [r for r in mf.read_inventory(self.text("inventory.csv"))[1] if r.get("ip")]
@@ -842,6 +925,7 @@ NAV = [  # audit order; "" is the Overview, at /
     ("inventory", "Inventory & Zones"),
     ("kit", "Auditor Kit"),
     ("scans", "Scans"),
+    ("automations", "Automations"),
     ("policy", "Flow Policy"),
     ("report", "Report"),
 ]
@@ -1064,7 +1148,10 @@ def make_handler(mission: Mission, users_file: Path, secure: bool, allowed_hosts
                 "/kit/groups": lambda: self._kit("groups", asset("groups.html"), tabulator),
                 "/kit/labels": lambda: self._kit("labels", asset("labels.html"), tabulator),
                 "/kit/kits": lambda: self._kit("kits", asset("kits.html")),
+                "/automations": lambda: self._page("Automations", asset("automations.html"), "automations"),
                 "/scans": lambda: self._page("Scans", asset("scans.html"), "scans"),
+                "/api/automations": lambda: self._json(mission.automations()),
+                "/api/automations/context": lambda: self._json(mission.automation_context()),
                 "/api/kits": lambda: self._json(mission.kits()),
                 "/api/kits/export": lambda: self._download(
                     f"{q.get('name', ['kit'])[0]}.zip",
@@ -1160,6 +1247,10 @@ def make_handler(mission: Mission, users_file: Path, secure: bool, allowed_hosts
                     )
                 if url.path == "/api/profiles/preview":
                     return self._json(mission.preview(json.loads(body)))
+                if url.path == "/api/automations":
+                    return self._json(mission.save_automations(json.loads(body)))
+                if url.path == "/api/automations/test":
+                    return self._json(mission.test_automation(json.loads(body)))
                 if url.path == "/api/scans/source":
                     mission.add_source(json.loads(body).get("ip", ""))
                     return self._json(mission.scans())

@@ -91,6 +91,15 @@ def run(args: argparse.Namespace) -> list[str]:
     groups = load_port_groups(args.port_groups)
     policy = load_policy(args.policy, inv, groups) if args.policy else None
     excluded = discover_excluded(args.scans)
+    automations = None
+    if args.mission:
+        auto_path = os.path.join(args.mission, "automations.ini")
+        if os.path.isfile(auto_path):
+            from segowl.automations import load_automations
+            try:
+                automations = load_automations(auto_path)
+            except ValueError as e:
+                sys.exit(str(e))
     a = analyze(
         inv,
         scans,
@@ -101,6 +110,7 @@ def run(args: argparse.Namespace) -> list[str]:
         excluded=excluded,
         declared=discover_declared(args.scans),
         labels=load_labels(Path(args.mission, "port_labels.csv") if args.mission else None),
+        automations=automations,
     )
     matrix, missing, unknown, agg, exp = a.matrix, a.missing, a.unknown, a.agg, a.exp
 

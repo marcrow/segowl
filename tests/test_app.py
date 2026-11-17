@@ -387,6 +387,7 @@ def test_old_urls_redirect_and_every_screen_is_linked_from_every_page(served):
         "/kit/labels",
         "/kit/kits",
         "/scans",
+        "/automations",
         "/policy",
         "/report",
     ]

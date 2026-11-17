@@ -32,7 +32,7 @@ from segowl.render.mermaid import (
     _no_highlight,
     hid,
 )
-from segowl.verdict import ALIVE, BLOCK, NODATA, OPEN, REACH, STATE_RANK, VCLASS, VERDICT_NAME, Cell
+from segowl.verdict import ALIVE, BLOCK, EXCLUDED, NODATA, OPEN, REACH, STATE_RANK, VCLASS, VERDICT_NAME, Cell
 
 ASSETS = Path(__file__).resolve().parent.parent / "assets"
 # the report takes the app's palette (app.css :root) so both stay one look
@@ -279,6 +279,7 @@ VERDICT_TIP = {
     ALIVE: "Answers ping/ARP but no port gets through — scan deeper",
     BLOCK: "No answer to discovery, or only filtered ports",
     NODATA: "This Interface was not in the Scan output",
+    EXCLUDED: "Every observation was removed by Automations",
 }
 
 
