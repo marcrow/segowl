@@ -1256,6 +1256,10 @@ def make_handler(mission: Mission, users_file: Path, secure: bool, allowed_hosts
                     return self._json(mission.save_automations(json.loads(body)))
                 if url.path == "/api/automations/test":
                     return self._json(mission.test_automation(json.loads(body)))
+                if url.path == "/api/automations/reapply":
+                    mission.state = None
+                    mission.refresh()
+                    return self._json({"ok": True, "lines": mission.lines, "error": mission.error})
                 if url.path == "/api/scans/source":
                     mission.add_source(json.loads(body).get("ip", ""))
                     return self._json(mission.scans())

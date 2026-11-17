@@ -253,6 +253,8 @@ def _source_table_html(src: str, a: Analysis) -> str:
     """Target details of a Source; a row with open ports unfolds what each Scan saw per port."""
     inv, row, labels = a.inv, a.matrix[src], _labels(a)
     extras = extra_columns(inv)
+    if a.derived_tags and "tags" not in extras:
+        extras = [*extras, "tags"]
     rows = []
     for d in ordered_ips(inv):
         if inv[d].machine == inv[src].machine:

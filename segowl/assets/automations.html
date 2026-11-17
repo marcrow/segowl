@@ -1,52 +1,79 @@
 <!-- SegOWL — Automations page body, wrapped by app.page(). -->
+<style>
+.aform{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;align-items:start}
+.aform label{font-size:13px;color:var(--slate);margin-bottom:2px;display:block}
+.aform .full{grid-column:1/-1}
+.aform input,.aform select{width:100%;box-sizing:border-box}
+.aform .cond-wrap{position:relative;font-family:var(--mono,monospace)}
+.aform .cond-wrap input{font-family:inherit;padding-right:28px}
+.cond-dd{position:absolute;left:0;right:0;top:100%;z-index:20;background:var(--bg,#fff);
+  border:1px solid var(--border,#d1d5db);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.12);
+  max-height:200px;overflow-y:auto;display:none}
+.cond-dd.on{display:block}
+.cond-dd div{padding:5px 10px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:6px}
+.cond-dd div:hover,.cond-dd div.sel{background:var(--accent,#e0edfe)}
+.cond-dd .cat{font-size:10px;color:var(--slate);min-width:48px;text-align:right;opacity:.7}
+.abtns{display:flex;gap:8px;align-items:center;margin-top:4px}
+.abtns .muted{flex:1}
+.alist .card{display:flex;align-items:center;gap:10px;padding:10px 14px}
+.alist .card .pill{min-width:52px;text-align:center;font-size:11px}
+.alist .card b{min-width:100px}
+.alist .card code{flex:1;font-size:12px;color:var(--slate);word-break:break-all}
+.alist .card .acts{display:flex;gap:4px;white-space:nowrap}
+#testerr{color:var(--red);font-size:13px;margin-top:4px}
+#testres{color:#059669;font-size:13px;margin-top:4px}
+</style>
 <main class="narrow">
 <h2>Automations</h2>
 <p class="sub">Condition → action rules that run after each Scan import.
 <b>Tag</b> derives a Machine Tag from results. <b>Exclude</b> removes matching port observations from the analysis.</p>
 <div id="warn"></div>
-<div class="toolbar">
-  <button class="btn pri" id="addb">+ New Automation</button>
-  <button class="btn" id="reapply" title="Re-apply all Automations (forces a full report regeneration)">Re-apply all</button>
-</div>
-<div id="list"></div>
 
-<!-- add / edit modal -->
-<div class="modal-bg" id="mbg" hidden>
-<div class="modal" style="max-width:640px">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-    <b id="mtitle">New Automation</b><button class="closebtn" id="mclose">✕</button>
+<!-- inline editor card -->
+<div class="card" id="editor">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+    <b id="etitle">New Automation</b>
+    <span class="small muted" id="modeswitch"><a href="#" id="totext">text</a> · <a href="#" id="tovisual">visual</a></span>
+    <span style="flex:1"></span>
+    <button class="btn sm" id="clearb" style="display:none">Cancel edit</button>
   </div>
-  <label>Name<input type="text" id="aname" style="width:100%" placeholder="e.g. web-servers, firewall-noise"></label>
-  <label style="margin-top:8px">Action
-    <select id="aaction"><option value="tag">tag</option><option value="exclude">exclude</option></select>
-  </label>
-  <div id="tagrow" style="margin-top:8px"><label>Tag name<input type="text" id="atag" placeholder="e.g. windows, web_server" style="width:100%"></label></div>
-  <div style="margin-top:8px">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-      <label style="margin:0">Condition</label>
-      <span class="small muted" id="modeswitch"><a href="#" id="totext">text</a> · <a href="#" id="tovisual">visual</a></span>
+  <div class="aform">
+    <div><label>Name</label><input type="text" id="aname" placeholder="e.g. web-servers, firewall-noise"></div>
+    <div style="display:flex;gap:8px">
+      <div style="flex:1"><label>Action</label><select id="aaction"><option value="tag">tag</option><option value="exclude">exclude</option></select></div>
+      <div style="flex:1" id="tagrow"><label>Tag name</label><input type="text" id="atag" placeholder="e.g. windows"></div>
     </div>
-    <!-- text mode -->
-    <div id="textmode">
-      <input type="text" id="acond" style="width:100%;font-family:monospace" list="condlist"
-        placeholder='e.g. port = 80 or port = 443'>
-      <datalist id="condlist"></datalist>
-      <div class="small muted" style="margin-top:2px">Fields: port, state, protocol, zone, machine, tag. Operators: =, !=, and, or, (parentheses). Quote values with spaces.</div>
-    </div>
-    <!-- visual mode -->
-    <div id="visualmode" hidden>
-      <div id="clauses"></div>
-      <button class="btn sm" id="addclause" style="margin-top:4px">+ Add clause</button>
+    <div class="full">
+      <label>Condition</label>
+      <!-- text mode -->
+      <div id="textmode" class="cond-wrap">
+        <input type="text" id="acond" autocomplete="off"
+          placeholder='e.g. port = 80 or port = 443'>
+        <div class="cond-dd" id="cdd"></div>
+      </div>
+      <!-- visual mode -->
+      <div id="visualmode" hidden>
+        <div id="clauses"></div>
+        <button class="btn sm" id="addclause" style="margin-top:4px">+ clause</button>
+      </div>
+      <div class="small muted" style="margin-top:2px">Fields: port, state, protocol, zone, machine, tag. Operators: =, !=, and, or, (parentheses).</div>
     </div>
   </div>
-  <div id="testerr" class="err" hidden></div>
-  <div id="testres" class="ok" hidden></div>
-  <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end">
+  <div id="testerr" hidden></div>
+  <div id="testres" hidden></div>
+  <div class="abtns">
+    <span class="muted small" id="edithint"></span>
     <button class="btn" id="testb">Test</button>
     <button class="btn pri" id="saveb">Save</button>
   </div>
 </div>
+
+<!-- list -->
+<div style="display:flex;align-items:center;gap:8px;margin:12px 0 6px">
+  <b style="flex:1">Automations</b>
+  <button class="btn sm" id="reapply" title="Force a full report regeneration with the current Automations">Re-apply all</button>
 </div>
+<div class="alist" id="list"></div>
 
 <!-- delete confirm modal -->
 <div class="modal-bg" id="dmbg" hidden>
@@ -66,75 +93,60 @@
 let D = {fp: "", automations: []}, CTX = {zones: [], machines: [], tags: []};
 let editing = null; // index in D.automations, or null for new
 
+// ---------------------------------------------------------------- list
 function render() {
   const list = $("#list");
   if (!D.automations.length) {
-    list.innerHTML = '<div class="card"><p class="muted">No Automation yet. Create one to tag Machines or exclude noise.</p></div>';
+    list.innerHTML = '<div class="card"><p class="muted" style="margin:0">No Automation yet.</p></div>';
     return;
   }
-  list.innerHTML = D.automations.map((a, i) => `<div class="card" style="display:flex;align-items:center;gap:12px;padding:10px 14px">
-    <span class="pill" style="min-width:60px;text-align:center">${esc(a.action)}</span>
-    <b style="min-width:120px">${esc(a.name)}</b>
-    <code style="flex:1;font-size:12px;color:var(--slate)">${esc(a.condition)}</code>
+  list.innerHTML = D.automations.map((a, i) => `<div class="card">
+    <span class="pill">${esc(a.action)}</span>
+    <b>${esc(a.name)}</b>
+    <code>${esc(a.condition)}</code>
     ${a.action === "tag" ? `<span class="pill">${esc(a.tag)}</span>` : ""}
-    <button class="btn sm" data-edit="${i}">Edit</button>
-    <button class="btn sm" data-del="${i}" style="color:var(--red)">Delete</button>
+    <span class="acts">
+      <button class="btn sm" data-edit="${i}">Edit</button>
+      <button class="btn sm" data-del="${i}" style="color:var(--red)">Delete</button>
+    </span>
   </div>`).join("");
   list.querySelectorAll("[data-edit]").forEach(b => b.onclick = () => openEdit(+b.dataset.edit));
   list.querySelectorAll("[data-del]").forEach(b => b.onclick = () => openDel(+b.dataset.del));
 }
 
-async function load() {
-  [D, CTX] = await Promise.all([api("/api/automations"), api("/api/automations/context")]);
-  if (D.error) { $("#warn").innerHTML = `<div class="err">${esc(D.error)}</div>`; D.automations = []; }
-  render();
-}
-
-function openModal() { $("#mbg").hidden = false; }
-function closeModal() { $("#mbg").hidden = true; editing = null; }
-function closeDel() { $("#dmbg").hidden = true; }
-
-function openEdit(i) {
-  editing = i;
-  const a = D.automations[i];
-  $("#mtitle").textContent = "Edit Automation";
-  $("#aname").value = a.name;
-  $("#aaction").value = a.action;
-  $("#atag").value = a.tag || "";
-  $("#acond").value = a.condition;
-  toggleTagRow();
-  hideResults();
-  openModal();
-}
-
-function openNew() {
+// ---------------------------------------------------------------- editor
+function clearEditor() {
   editing = null;
-  $("#mtitle").textContent = "New Automation";
+  $("#etitle").textContent = "New Automation";
   $("#aname").value = "";
   $("#aaction").value = "tag";
   $("#atag").value = "";
   $("#acond").value = "";
   toggleTagRow();
   hideResults();
-  openModal();
+  $("#clearb").style.display = "none";
+  $("#edithint").textContent = "";
+}
+
+function openEdit(i) {
+  editing = i;
+  const a = D.automations[i];
+  $("#etitle").textContent = "Edit: " + a.name;
+  $("#aname").value = a.name;
+  $("#aaction").value = a.action;
+  $("#atag").value = a.tag || "";
+  $("#acond").value = a.condition;
+  toggleTagRow();
+  hideResults();
+  $("#clearb").style.display = "";
+  $("#edithint").textContent = "Editing #" + (i + 1);
+  $("#editor").scrollIntoView({behavior: "smooth", block: "nearest"});
 }
 
 function toggleTagRow() { $("#tagrow").style.display = $("#aaction").value === "tag" ? "" : "none"; }
 function hideResults() { $("#testerr").hidden = true; $("#testres").hidden = true; }
 
-let delIdx = null;
-function openDel(i) {
-  delIdx = i;
-  $("#dtext").textContent = `Delete "${D.automations[i].name}"? This cannot be undone.`;
-  $("#dmbg").hidden = false;
-}
-
-async function doDelete() {
-  D.automations.splice(delIdx, 1);
-  closeDel();
-  await save();
-}
-
+// ---------------------------------------------------------------- save / delete
 async function doSave() {
   const a = {
     name: $("#aname").value.trim(),
@@ -145,8 +157,8 @@ async function doSave() {
   if (!a.name || !a.condition) { toast("Name and condition are required"); return; }
   if (editing !== null) D.automations[editing] = a;
   else D.automations.push(a);
-  closeModal();
   await save();
+  clearEditor();
 }
 
 async function save() {
@@ -159,49 +171,150 @@ async function save() {
   } catch (e) { toast("Error: " + e.message); await load(); }
 }
 
+let delIdx = null;
+function openDel(i) {
+  delIdx = i;
+  $("#dtext").textContent = `Delete "${D.automations[i].name}"? This cannot be undone.`;
+  $("#dmbg").hidden = false;
+}
+function closeDel() { $("#dmbg").hidden = true; }
+async function doDelete() {
+  D.automations.splice(delIdx, 1);
+  closeDel();
+  if (editing === delIdx) clearEditor();
+  await save();
+}
+
+// ---------------------------------------------------------------- test
 async function doTest() {
   hideResults();
-  const r = await api("/api/automations/test", {condition: $("#acond").value.trim()});
+  const cond = $("#acond").value.trim();
+  if (!cond) { toast("Enter a condition first"); return; }
+  const r = await api("/api/automations/test", {condition: cond});
   if (r.error) { $("#testerr").textContent = r.error; $("#testerr").hidden = false; return; }
   $("#testres").innerHTML = `${r.matches} observation(s) match` +
     (r.machines.length ? ` · Machines: ${r.machines.map(esc).join(", ")}` : "");
   $("#testres").hidden = false;
 }
 
-// autocomplete
-function updateSuggestions() {
-  const dl = $("#condlist"), v = $("#acond").value;
-  const last = v.split(/\s+/).pop().toLowerCase();
-  const all = ["port", "state", "protocol", "zone", "machine", "tag", "=", "!=", "and", "or",
-    ...CTX.zones, ...CTX.machines, ...CTX.tags,
-    "open", "closed", "filtered", "unfiltered", "tcp", "udp"];
-  dl.innerHTML = all.filter(s => s.toLowerCase().startsWith(last) && s !== last).slice(0, 30)
-    .map(s => `<option value="${esc(v.slice(0, v.length - last.length) + s)}">`).join("");
+// ---------------------------------------------------------------- context-aware autocomplete
+const FIELDS = ["port", "state", "protocol", "zone", "machine", "tag"];
+const OPS = ["=", "!="];
+const LOGIC = ["and", "or"];
+const STATE_VALS = ["open", "closed", "filtered", "unfiltered"];
+const PROTO_VALS = ["tcp", "udp"];
+const COMMON_PORTS = ["22", "80", "443", "445", "3389", "8080", "8443", "53", "25", "110", "143", "993", "995", "3306", "5432", "1433", "27017", "6379", "9200"];
+
+function condContext() {
+  const v = $("#acond").value, cur = v.length;
+  // tokenize everything before cursor
+  const before = v.slice(0, cur);
+  const tokens = before.match(/(?:"[^"]*"|[^\s])+/g) || [];
+  const partial = before.endsWith(" ") ? "" : (tokens.pop() || "");
+  // determine position in grammar: field, op, value, logic
+  // count complete triplets (field op value) before the partial
+  let pos = 0; // 0=field/logic, 1=field-after-logic, 2=op, 3=value
+  for (const t of tokens) {
+    if (pos === 0 && LOGIC.includes(t.toLowerCase())) { pos = 1; continue; }
+    if (pos === 0 || pos === 1) { pos = 2; continue; } // was a field
+    if (pos === 2) { pos = 3; continue; } // was an op
+    if (pos === 3) { pos = 0; continue; } // was a value
+  }
+  // what field did the user just type?
+  let currentField = null;
+  for (let i = tokens.length - 1; i >= 0; i--) {
+    if (FIELDS.includes(tokens[i].toLowerCase())) { currentField = tokens[i].toLowerCase(); break; }
+    if (LOGIC.includes(tokens[i].toLowerCase())) break;
+  }
+  return {pos, partial: partial.toLowerCase(), raw: partial, currentField, before, tokens};
 }
 
-// visual builder
+function suggestions() {
+  const {pos, partial, currentField} = condContext();
+  let items = [];
+  if (pos === 0) {
+    // expect logic keyword or a field (start of condition)
+    items = [...LOGIC.map(l => ({t: l, cat: "logic"})), ...FIELDS.map(f => ({t: f, cat: "field"}))];
+  } else if (pos === 1) {
+    // after logic → field
+    items = FIELDS.map(f => ({t: f, cat: "field"}));
+  } else if (pos === 2) {
+    // after field → operator
+    items = OPS.map(o => ({t: o, cat: "op"}));
+  } else if (pos === 3) {
+    // after op → values, depending on currentField
+    if (currentField === "port") items = COMMON_PORTS.map(p => ({t: p, cat: "port"}));
+    else if (currentField === "state") items = STATE_VALS.map(s => ({t: s, cat: "state"}));
+    else if (currentField === "protocol") items = PROTO_VALS.map(p => ({t: p, cat: "protocol"}));
+    else if (currentField === "zone") items = CTX.zones.map(z => ({t: z.includes(" ") ? `"${z}"` : z, cat: "zone"}));
+    else if (currentField === "machine") items = CTX.machines.map(m => ({t: m.includes(" ") ? `"${m}"` : m, cat: "machine"}));
+    else if (currentField === "tag") items = CTX.tags.map(t => ({t: t, cat: "tag"}));
+  }
+  if (partial) items = items.filter(i => i.t.toLowerCase().startsWith(partial) && i.t.toLowerCase() !== partial);
+  return items.slice(0, 12);
+}
+
+let ddSel = -1;
+function showDD() {
+  const items = suggestions();
+  const dd = $("#cdd");
+  if (!items.length) { dd.classList.remove("on"); return; }
+  ddSel = -1;
+  dd.innerHTML = items.map((it, i) =>
+    `<div data-i="${i}" data-v="${esc(it.t)}"><span class="cat">${esc(it.cat)}</span>${esc(it.t)}</div>`
+  ).join("");
+  dd.classList.add("on");
+  dd.querySelectorAll("div").forEach(d => {
+    d.onmousedown = e => { e.preventDefault(); pickDD(+d.dataset.i); };
+  });
+}
+
+function pickDD(i) {
+  const dd = $("#cdd");
+  const el = dd.children[i];
+  if (!el) return;
+  const val = el.dataset.v;
+  const {before, partial, raw} = condContext();
+  const inp = $("#acond");
+  const prefix = raw ? before.slice(0, before.length - raw.length) : before;
+  inp.value = prefix + val + " ";
+  dd.classList.remove("on");
+  inp.focus();
+}
+
+function ddNav(e) {
+  const dd = $("#cdd");
+  if (!dd.classList.contains("on")) return;
+  const items = dd.querySelectorAll("div");
+  if (e.key === "ArrowDown") { e.preventDefault(); ddSel = Math.min(ddSel + 1, items.length - 1); }
+  else if (e.key === "ArrowUp") { e.preventDefault(); ddSel = Math.max(ddSel - 1, 0); }
+  else if (e.key === "Enter" && ddSel >= 0) { e.preventDefault(); pickDD(ddSel); return; }
+  else if (e.key === "Escape") { dd.classList.remove("on"); return; }
+  else return;
+  items.forEach((d, i) => d.classList.toggle("sel", i === ddSel));
+}
+
+// ---------------------------------------------------------------- visual builder
 function addClause(field, op, value, logic) {
   const div = document.createElement("div");
   div.style.cssText = "display:flex;gap:4px;align-items:center;margin-bottom:4px";
-  const fields = ["port", "state", "protocol", "zone", "machine", "tag"];
-  const ops = ["=", "!="];
-  const logics = ["and", "or"];
+  const fields = FIELDS;
+  const ops = OPS;
+  const logics = LOGIC;
   div.innerHTML =
     (logic ? `<select class="cl">${logics.map(l => `<option${l === logic ? " selected" : ""}>${l}</option>`).join("")}</select>` : "") +
     `<select class="cf">${fields.map(f => `<option${f === field ? " selected" : ""}>${f}</option>`).join("")}</select>` +
     `<select class="co">${ops.map(o => `<option${o === op ? " selected" : ""}>${o}</option>`).join("")}</select>` +
-    `<input type="text" class="cv" value="${esc(value || "")}" style="flex:1" list="condlist">` +
+    `<input type="text" class="cv" value="${esc(value || "")}" style="flex:1">` +
     `<button class="btn sm" style="color:var(--red)">✕</button>`;
   div.querySelector("button").onclick = () => { div.remove(); syncVisualToText(); };
   div.querySelectorAll("select, input").forEach(el => el.onchange = el.oninput = syncVisualToText);
   $("#clauses").appendChild(div);
 }
-
 function syncVisualToText() {
   const divs = [...$("#clauses").children];
   const parts = divs.map(d => {
-    const f = d.querySelector(".cf").value;
-    const o = d.querySelector(".co").value;
+    const f = d.querySelector(".cf").value, o = d.querySelector(".co").value;
     let v = d.querySelector(".cv").value.trim();
     if (v.includes(" ")) v = `"${v}"`;
     const l = d.querySelector(".cl");
@@ -209,13 +322,12 @@ function syncVisualToText() {
   });
   $("#acond").value = parts.join(" ");
 }
-
 function syncTextToVisual() {
   $("#clauses").innerHTML = "";
   const text = $("#acond").value.trim();
   if (!text) { addClause("port", "=", ""); return; }
   if (/[()]/.test(text)) {
-    toast("Parenthesised conditions: use text mode to edit, or remove the parentheses");
+    toast("Parenthesised conditions: use text mode");
     $("#totext").click();
     return;
   }
@@ -226,24 +338,31 @@ function syncTextToVisual() {
     if (!first && (tokens[i] === "and" || tokens[i] === "or")) { logic = tokens[i]; i++; }
     const field = tokens[i] || "port", op = tokens[i + 1] || "=", value = (tokens[i + 2] || "").replace(/^"|"$/g, "");
     addClause(field, op, value, first ? null : logic || "and");
-    first = false;
-    i += 3;
+    first = false; i += 3;
   }
 }
 
-// wiring
-$("#addb").onclick = openNew;
-$("#mclose").onclick = closeModal;
-$("#mbg").onclick = e => { if (e.target === $("#mbg")) closeModal(); };
+// ---------------------------------------------------------------- wiring
+$("#clearb").onclick = clearEditor;
 $("#dcancel").onclick = closeDel;
 $("#dmbg").onclick = e => { if (e.target === $("#dmbg")) closeDel(); };
 $("#dconfirm").onclick = doDelete;
 $("#aaction").onchange = toggleTagRow;
 $("#saveb").onclick = doSave;
 $("#testb").onclick = doTest;
-$("#acond").oninput = updateSuggestions;
-$("#reapply").onclick = async () => { toast("Re-applying…"); await fetch("/report", {headers: {"Cache-Control": "no-cache"}}); toast("Done"); };
-document.addEventListener("keydown", e => { if (e.key === "Escape") { closeModal(); closeDel(); } });
+$("#acond").oninput = showDD;
+$("#acond").onfocus = showDD;
+$("#acond").onblur = () => setTimeout(() => $("#cdd").classList.remove("on"), 150);
+$("#acond").onkeydown = ddNav;
+$("#reapply").onclick = async () => {
+  toast("Re-applying…");
+  try {
+    const r = await api("/api/automations/reapply", {});
+    if (r.error) toast("Error: " + r.error);
+    else toast("Report regenerated");
+  } catch (e) { toast("Error: " + e.message); }
+};
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeDel(); });
 
 // mode switch
 let textMode = true;
@@ -251,5 +370,10 @@ $("#totext").onclick = e => { e.preventDefault(); textMode = true; $("#textmode"
 $("#tovisual").onclick = e => { e.preventDefault(); textMode = false; $("#textmode").hidden = true; $("#visualmode").hidden = false; syncTextToVisual(); };
 $("#addclause").onclick = () => { addClause("port", "=", "", $("#clauses").children.length ? "and" : null); };
 
+async function load() {
+  [D, CTX] = await Promise.all([api("/api/automations"), api("/api/automations/context")]);
+  if (D.error) { $("#warn").innerHTML = `<div class="err">${esc(D.error)}</div>`; D.automations = []; }
+  render();
+}
 load();
 </script>
