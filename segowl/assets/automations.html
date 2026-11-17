@@ -4,24 +4,43 @@
 .aform label{font-size:13px;color:var(--slate);margin-bottom:2px;display:block}
 .aform .full{grid-column:1/-1}
 .aform input,.aform select{width:100%;box-sizing:border-box}
-.aform .cond-wrap{position:relative;font-family:var(--mono,monospace)}
-.aform .cond-wrap input{font-family:inherit;padding-right:28px}
-.cond-dd{position:absolute;left:0;right:0;top:100%;z-index:20;background:var(--bg,#fff);
-  border:1px solid var(--border,#d1d5db);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.12);
-  max-height:200px;overflow-y:auto;display:none}
+/* syntax-highlighted condition display (overlaid on the input) */
+.cond-wrap{position:relative;font-family:ui-monospace,monospace;font-size:13px}
+.cond-wrap input{font-family:inherit;font-size:inherit;background:transparent;position:relative;z-index:2;
+  caret-color:var(--ink);color:transparent;width:100%;box-sizing:border-box}
+.cond-hl{position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:1;
+  padding:6px 9px;white-space:pre;overflow:hidden;border:1px solid transparent;border-radius:6px}
+.cond-hl .f{color:#1565c0;font-weight:600}
+.cond-hl .op{color:#8d6e63}
+.cond-hl .v{color:#2e7d32}
+.cond-hl .l{color:#7c4dff;font-weight:600}
+.cond-hl .p{color:#b71c1c;font-weight:700}
+.cond-hl .err{text-decoration:wavy underline #dc2626}
+/* autocomplete dropdown */
+.cond-dd{position:absolute;left:0;right:0;top:100%;z-index:20;background:#fff;
+  border:1px solid var(--line);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.1);
+  max-height:200px;overflow-y:auto;display:none;margin-top:2px}
 .cond-dd.on{display:block}
-.cond-dd div{padding:5px 10px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:6px}
-.cond-dd div:hover,.cond-dd div.sel{background:var(--accent,#e0edfe)}
+.cond-dd div{padding:5px 10px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px}
+.cond-dd div:hover,.cond-dd div.sel{background:var(--mist)}
 .cond-dd .cat{font-size:10px;color:var(--slate);min-width:48px;text-align:right;opacity:.7}
-.abtns{display:flex;gap:8px;align-items:center;margin-top:4px}
+/* editor actions */
+.abtns{display:flex;gap:8px;align-items:center;margin-top:8px}
 .abtns .muted{flex:1}
-.alist .card{display:flex;align-items:center;gap:10px;padding:10px 14px}
+/* list cards */
+.alist .card{display:flex;align-items:center;gap:10px;padding:10px 14px;flex-wrap:wrap}
 .alist .card .pill{min-width:52px;text-align:center;font-size:11px}
 .alist .card b{min-width:100px}
-.alist .card code{flex:1;font-size:12px;color:var(--slate);word-break:break-all}
+.alist .card code{flex:1;font-size:12px;color:var(--slate);word-break:break-all;font-family:ui-monospace,monospace}
 .alist .card .acts{display:flex;gap:4px;white-space:nowrap}
-#testerr{color:var(--red);font-size:13px;margin-top:4px}
-#testres{color:#059669;font-size:13px;margin-top:4px}
+#testerr{color:var(--red);font-size:13px;margin-top:6px}
+#testres{color:#059669;font-size:13px;margin-top:6px}
+/* visual mode clauses */
+.clause{display:flex;gap:6px;align-items:center;margin-bottom:6px}
+.clause select{min-width:72px}
+.clause .cv{flex:1;min-width:120px}
+.clause .xbtn{color:var(--red);cursor:pointer;font-size:14px;padding:4px;border:0;background:none}
+.clause .xbtn:hover{opacity:.7}
 </style>
 <main class="narrow">
 <h2>Automations</h2>
@@ -31,9 +50,12 @@
 
 <!-- inline editor card -->
 <div class="card" id="editor">
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
     <b id="etitle">New Automation</b>
-    <span class="small muted" id="modeswitch"><a href="#" id="totext">text</a> · <a href="#" id="tovisual">visual</a></span>
+    <div class="seg" id="modeseg">
+      <button class="on" id="totext">text</button>
+      <button id="tovisual">visual</button>
+    </div>
     <span style="flex:1"></span>
     <button class="btn sm" id="clearb" style="display:none">Cancel edit</button>
   </div>
@@ -47,6 +69,7 @@
       <label>Condition</label>
       <!-- text mode -->
       <div id="textmode" class="cond-wrap">
+        <div class="cond-hl" id="hl"></div>
         <input type="text" id="acond" autocomplete="off"
           placeholder='e.g. port = 80 or port = 443'>
         <div class="cond-dd" id="cdd"></div>
@@ -56,7 +79,7 @@
         <div id="clauses"></div>
         <button class="btn sm" id="addclause" style="margin-top:4px">+ clause</button>
       </div>
-      <div class="small muted" style="margin-top:2px">Fields: port, state, protocol, zone, machine, tag. Operators: =, !=, and, or, (parentheses).</div>
+      <div class="small muted" style="margin-top:4px">Fields: port, state, protocol, zone, machine, tag. Operators: =, !=, and, or, (parentheses).</div>
     </div>
   </div>
   <div id="testerr" hidden></div>
@@ -69,7 +92,7 @@
 </div>
 
 <!-- list -->
-<div style="display:flex;align-items:center;gap:8px;margin:12px 0 6px">
+<div style="display:flex;align-items:center;gap:8px;margin:14px 0 6px">
   <b style="flex:1">Automations</b>
   <button class="btn sm" id="reapply" title="Force a full report regeneration with the current Automations">Re-apply all</button>
 </div>
@@ -88,10 +111,52 @@
 </div>
 </main>
 <script>
-// $, esc, api, toast are defined in app_common.js (loaded first by app.page())
-
 let D = {fp: "", automations: []}, CTX = {zones: [], machines: [], tags: []};
-let editing = null; // index in D.automations, or null for new
+let editing = null;
+
+// ---------------------------------------------------------------- syntax highlighting
+const FIELDS = ["port", "state", "protocol", "zone", "machine", "tag"];
+const OPS = ["=", "!="];
+const LOGIC = ["and", "or"];
+const STATE_VALS = ["open", "closed", "filtered", "unfiltered"];
+const PROTO_VALS = ["tcp", "udp"];
+const COMMON_PORTS = ["22", "80", "443", "445", "3389", "8080", "8443", "53", "25", "110", "143", "993", "995", "3306", "5432", "1433", "27017", "6379", "9200"];
+
+function hlTokenize(text) {
+  const out = [];
+  let i = 0, n = text.length;
+  while (i < n) {
+    if (text[i] === " " || text[i] === "\t") { out.push({t: text[i], k: "s"}); i++; continue; }
+    if (text[i] === "(") { out.push({t: "(", k: "p"}); i++; continue; }
+    if (text[i] === ")") { out.push({t: ")", k: "p"}); i++; continue; }
+    if (text[i] === '"') {
+      let j = text.indexOf('"', i + 1);
+      if (j < 0) j = n;
+      out.push({t: text.slice(i, j + 1), k: "v"});
+      i = j + 1; continue;
+    }
+    if (text.slice(i, i + 2) === "!=") { out.push({t: "!=", k: "op"}); i += 2; continue; }
+    if (text[i] === "=") { out.push({t: "=", k: "op"}); i++; continue; }
+    let j = i;
+    while (j < n && !" \t\"()=".includes(text[j]) && text.slice(j, j + 2) !== "!=") j++;
+    const w = text.slice(i, j);
+    const low = w.toLowerCase();
+    if (FIELDS.includes(low)) out.push({t: w, k: "f"});
+    else if (LOGIC.includes(low)) out.push({t: w, k: "l"});
+    else out.push({t: w, k: "v"});
+    i = j;
+  }
+  return out;
+}
+
+function updateHL() {
+  const text = $("#acond").value;
+  if (!text) { $("#hl").innerHTML = ""; return; }
+  const tokens = hlTokenize(text);
+  $("#hl").innerHTML = tokens.map(t =>
+    t.k === "s" ? t.t : `<span class="${t.k}">${esc(t.t)}</span>`
+  ).join("");
+}
 
 // ---------------------------------------------------------------- list
 function render() {
@@ -122,6 +187,7 @@ function clearEditor() {
   $("#aaction").value = "tag";
   $("#atag").value = "";
   $("#acond").value = "";
+  updateHL();
   toggleTagRow();
   hideResults();
   $("#clearb").style.display = "none";
@@ -136,6 +202,7 @@ function openEdit(i) {
   $("#aaction").value = a.action;
   $("#atag").value = a.tag || "";
   $("#acond").value = a.condition;
+  updateHL();
   toggleTagRow();
   hideResults();
   $("#clearb").style.display = "";
@@ -198,29 +265,18 @@ async function doTest() {
 }
 
 // ---------------------------------------------------------------- context-aware autocomplete
-const FIELDS = ["port", "state", "protocol", "zone", "machine", "tag"];
-const OPS = ["=", "!="];
-const LOGIC = ["and", "or"];
-const STATE_VALS = ["open", "closed", "filtered", "unfiltered"];
-const PROTO_VALS = ["tcp", "udp"];
-const COMMON_PORTS = ["22", "80", "443", "445", "3389", "8080", "8443", "53", "25", "110", "143", "993", "995", "3306", "5432", "1433", "27017", "6379", "9200"];
-
 function condContext() {
   const v = $("#acond").value, cur = v.length;
-  // tokenize everything before cursor
   const before = v.slice(0, cur);
   const tokens = before.match(/(?:"[^"]*"|[^\s])+/g) || [];
   const partial = before.endsWith(" ") ? "" : (tokens.pop() || "");
-  // determine position in grammar: field, op, value, logic
-  // count complete triplets (field op value) before the partial
-  let pos = 0; // 0=field/logic, 1=field-after-logic, 2=op, 3=value
+  let pos = 0;
   for (const t of tokens) {
     if (pos === 0 && LOGIC.includes(t.toLowerCase())) { pos = 1; continue; }
-    if (pos === 0 || pos === 1) { pos = 2; continue; } // was a field
-    if (pos === 2) { pos = 3; continue; } // was an op
-    if (pos === 3) { pos = 0; continue; } // was a value
+    if (pos === 0 || pos === 1) { pos = 2; continue; }
+    if (pos === 2) { pos = 3; continue; }
+    if (pos === 3) { pos = 0; continue; }
   }
-  // what field did the user just type?
   let currentField = null;
   for (let i = tokens.length - 1; i >= 0; i--) {
     if (FIELDS.includes(tokens[i].toLowerCase())) { currentField = tokens[i].toLowerCase(); break; }
@@ -233,16 +289,12 @@ function suggestions() {
   const {pos, partial, currentField} = condContext();
   let items = [];
   if (pos === 0) {
-    // expect logic keyword or a field (start of condition)
     items = [...LOGIC.map(l => ({t: l, cat: "logic"})), ...FIELDS.map(f => ({t: f, cat: "field"}))];
   } else if (pos === 1) {
-    // after logic → field
     items = FIELDS.map(f => ({t: f, cat: "field"}));
   } else if (pos === 2) {
-    // after field → operator
     items = OPS.map(o => ({t: o, cat: "op"}));
   } else if (pos === 3) {
-    // after op → values, depending on currentField
     if (currentField === "port") items = COMMON_PORTS.map(p => ({t: p, cat: "port"}));
     else if (currentField === "state") items = STATE_VALS.map(s => ({t: s, cat: "state"}));
     else if (currentField === "protocol") items = PROTO_VALS.map(p => ({t: p, cat: "protocol"}));
@@ -256,6 +308,7 @@ function suggestions() {
 
 let ddSel = -1;
 function showDD() {
+  updateHL();
   const items = suggestions();
   const dd = $("#cdd");
   if (!items.length) { dd.classList.remove("on"); return; }
@@ -274,11 +327,12 @@ function pickDD(i) {
   const el = dd.children[i];
   if (!el) return;
   const val = el.dataset.v;
-  const {before, partial, raw} = condContext();
+  const {before, raw} = condContext();
   const inp = $("#acond");
   const prefix = raw ? before.slice(0, before.length - raw.length) : before;
   inp.value = prefix + val + " ";
   dd.classList.remove("on");
+  updateHL();
   inp.focus();
 }
 
@@ -291,23 +345,20 @@ function ddNav(e) {
   else if (e.key === "Enter" && ddSel >= 0) { e.preventDefault(); pickDD(ddSel); return; }
   else if (e.key === "Escape") { dd.classList.remove("on"); return; }
   else return;
-  items.forEach((d, i) => d.classList.toggle("sel", i === ddSel));
+  items.forEach((d, j) => d.classList.toggle("sel", j === ddSel));
 }
 
 // ---------------------------------------------------------------- visual builder
 function addClause(field, op, value, logic) {
   const div = document.createElement("div");
-  div.style.cssText = "display:flex;gap:4px;align-items:center;margin-bottom:4px";
-  const fields = FIELDS;
-  const ops = OPS;
-  const logics = LOGIC;
+  div.className = "clause";
   div.innerHTML =
-    (logic ? `<select class="cl">${logics.map(l => `<option${l === logic ? " selected" : ""}>${l}</option>`).join("")}</select>` : "") +
-    `<select class="cf">${fields.map(f => `<option${f === field ? " selected" : ""}>${f}</option>`).join("")}</select>` +
-    `<select class="co">${ops.map(o => `<option${o === op ? " selected" : ""}>${o}</option>`).join("")}</select>` +
-    `<input type="text" class="cv" value="${esc(value || "")}" style="flex:1">` +
-    `<button class="btn sm" style="color:var(--red)">✕</button>`;
-  div.querySelector("button").onclick = () => { div.remove(); syncVisualToText(); };
+    (logic != null ? `<select class="cl">${LOGIC.map(l => `<option${l === logic ? " selected" : ""}>${l}</option>`).join("")}</select>` : "") +
+    `<select class="cf">${FIELDS.map(f => `<option${f === field ? " selected" : ""}>${f}</option>`).join("")}</select>` +
+    `<select class="co">${OPS.map(o => `<option${o === op ? " selected" : ""}>${o}</option>`).join("")}</select>` +
+    `<input type="text" class="cv" value="${esc(value || "")}" placeholder="value">` +
+    `<button class="xbtn" title="Remove clause">✕</button>`;
+  div.querySelector(".xbtn").onclick = () => { div.remove(); syncVisualToText(); };
   div.querySelectorAll("select, input").forEach(el => el.onchange = el.oninput = syncVisualToText);
   $("#clauses").appendChild(div);
 }
@@ -321,6 +372,7 @@ function syncVisualToText() {
     return (l ? l.value + " " : "") + `${f} ${o} ${v}`;
   });
   $("#acond").value = parts.join(" ");
+  updateHL();
 }
 function syncTextToVisual() {
   $("#clauses").innerHTML = "";
@@ -328,18 +380,32 @@ function syncTextToVisual() {
   if (!text) { addClause("port", "=", ""); return; }
   if (/[()]/.test(text)) {
     toast("Parenthesised conditions: use text mode");
-    $("#totext").click();
+    setMode(true);
     return;
   }
-  const tokens = text.match(/(?:"[^"]*"|[^\s])+/g) || [];
+  const toks = hlTokenize(text).filter(t => t.k !== "s");
   let i = 0, first = true;
-  while (i < tokens.length) {
+  while (i < toks.length) {
     let logic = null;
-    if (!first && (tokens[i] === "and" || tokens[i] === "or")) { logic = tokens[i]; i++; }
-    const field = tokens[i] || "port", op = tokens[i + 1] || "=", value = (tokens[i + 2] || "").replace(/^"|"$/g, "");
+    if (!first && toks[i] && toks[i].k === "l") { logic = toks[i].t; i++; }
+    const field = (toks[i] && toks[i].t) || "port";
+    const op = (toks[i+1] && toks[i+1].t) || "=";
+    const value = (toks[i+2] && toks[i+2].t || "").replace(/^"|"$/g, "");
     addClause(field, op, value, first ? null : logic || "and");
     first = false; i += 3;
   }
+}
+
+// ---------------------------------------------------------------- mode switch
+let textMode = true;
+function setMode(isText) {
+  textMode = isText;
+  $("#textmode").hidden = !isText;
+  $("#visualmode").hidden = isText;
+  $("#totext").classList.toggle("on", isText);
+  $("#tovisual").classList.toggle("on", !isText);
+  if (!isText) syncTextToVisual();
+  else updateHL();
 }
 
 // ---------------------------------------------------------------- wiring
@@ -354,6 +420,9 @@ $("#acond").oninput = showDD;
 $("#acond").onfocus = showDD;
 $("#acond").onblur = () => setTimeout(() => $("#cdd").classList.remove("on"), 150);
 $("#acond").onkeydown = ddNav;
+$("#totext").onclick = () => setMode(true);
+$("#tovisual").onclick = () => setMode(false);
+$("#addclause").onclick = () => { addClause("port", "=", "", $("#clauses").children.length ? "and" : null); };
 $("#reapply").onclick = async () => {
   toast("Re-applying…");
   try {
@@ -363,12 +432,6 @@ $("#reapply").onclick = async () => {
   } catch (e) { toast("Error: " + e.message); }
 };
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeDel(); });
-
-// mode switch
-let textMode = true;
-$("#totext").onclick = e => { e.preventDefault(); textMode = true; $("#textmode").hidden = false; $("#visualmode").hidden = true; };
-$("#tovisual").onclick = e => { e.preventDefault(); textMode = false; $("#textmode").hidden = true; $("#visualmode").hidden = false; syncTextToVisual(); };
-$("#addclause").onclick = () => { addClause("port", "=", "", $("#clauses").children.length ? "and" : null); };
 
 async function load() {
   [D, CTX] = await Promise.all([api("/api/automations"), api("/api/automations/context")]);
