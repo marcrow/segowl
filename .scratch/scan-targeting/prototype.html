@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Scan Targeting — prototype</title>
+<title>Scan Targeting — prototype v2</title>
 <style>
 /* SegOWL identity palette (subset) */
 :root{--navy:#0B1F33;--navy2:#12304D;--cyan:#00C8FF;--cyan2:#65E3FF;--amber:#FFB020;--slate:#6B7C93;--mist:#E6EDF5;
@@ -24,6 +24,7 @@ h2{margin:0 0 4px;font-size:18px}.sub{color:var(--slate);font-size:13px;margin:0
 .btn{border:1px solid #c3cad6;background:#fff;border-radius:6px;padding:6px 11px;font-size:13px;cursor:pointer;color:var(--ink);text-decoration:none;display:inline-block}
 .btn:hover{border-color:var(--cyan)}.btn.pri{background:var(--navy);color:#fff;border-color:var(--navy)}
 .btn.sm{padding:3px 8px;font-size:12px}
+.btn:disabled{opacity:.45;cursor:default}
 .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
 .toolbar .sep{width:1px;height:24px;background:var(--line);margin:0 4px}
 input[type=text],input[type=search],select{border:1px solid #c3cad6;border-radius:6px;padding:6px 9px;font-size:13px;font-family:inherit}
@@ -34,6 +35,16 @@ input:focus,select:focus{outline:2px solid var(--cyan2);border-color:var(--cyan)
 .pill{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:2px 9px;font-size:12px;background:var(--mist);color:#33415c;margin:2px}
 .pill.auto{background:#e8f5e9;color:#2e7d32;border:1px dashed #81c784;font-style:italic}
 .zonechip{display:inline-block;padding:0 6px;border:1.5px solid;border-radius:4px;font-size:11.5px;font-weight:600}
+/* opt grid from the real page */
+.opt{display:grid;grid-template-columns:140px 1fr;gap:6px 10px;align-items:center;margin:8px 0}
+.opt label.t{font-weight:600;font-size:12.5px}.opt .h{grid-column:2;font-size:11.5px;color:var(--slate);margin-top:-4px}
+/* layout */
+.layout{display:grid;gap:14px}
+/* token line from the real page */
+.tokenline{display:flex;flex-wrap:wrap;gap:6px;align-items:center;background:var(--navy);border-radius:10px;padding:12px;min-height:56px}
+.tok{font-family:ui-monospace,monospace;font-size:12.5px;border-radius:6px;padding:3px 8px;background:#1f4266;color:#e6f7ff;display:inline-flex;gap:6px;align-items:center}
+.tok.port{background:#063f52;color:var(--cyan2)}.tok.opt{background:#3d2f05;color:#ffd27a}.tok.fixed{opacity:.6}
+pre.cmd{background:var(--navy);color:#e6f7ff;border-radius:8px;padding:12px;font-size:12px;white-space:pre-wrap;word-break:break-all;margin:4px 0 8px}
 /* scans grid */
 table.grid{border-collapse:collapse;background:#fff;font-size:12.5px;width:100%}
 table.grid th,table.grid td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
@@ -42,43 +53,87 @@ table.grid td.done{background:#e6f7ec;color:#14532d;text-align:center;font-weigh
 table.grid td.todo{background:#fbfcfe;color:#9aa3b2;text-align:center}
 .stephead{display:flex;align-items:center;gap:10px}
 .stepn{width:24px;height:24px;border-radius:50%;background:var(--amber);color:var(--navy);font-weight:700;display:inline-flex;align-items:center;justify-content:center;font-size:13px}
-/* target filter */
-.filter-box{background:#f6fbff;border:1px solid #bfe9f7;border-left:4px solid var(--cyan);border-radius:8px;padding:10px 14px;margin:0 0 12px}
-.filter-row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:6px 0}
-.filter-row label{cursor:pointer;display:inline-flex;align-items:center;gap:4px;font-size:13px}
-.filter-row label input[type=checkbox]{margin:0}
-.filter-sep{width:1px;height:22px;background:var(--line);margin:0 2px}
-.filter-count{font-size:13px;font-weight:600;color:var(--navy);margin-top:4px}
-.filter-count .n{font-size:16px;color:var(--cyan);font-weight:700}
+/* status pill */
+.status{font-size:12px;padding:3px 9px;border-radius:999px;background:var(--mist);color:#33415c}
+/* modified bar */
+.modbar{display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;background:#fffaf0;border:1px solid #f3d27a;border-left:4px solid var(--amber);border-radius:8px;padding:8px 12px;margin:8px 0 12px;font-size:13px}
+/* targeting section */
+.tgt{border-top:1px solid var(--line);margin-top:14px;padding-top:12px}
+.tgt-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.tgt-head b{font-size:13.5px}
+.tgt-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:6px 0}
+.tgt-row .lbl{font-weight:600;font-size:12px;min-width:48px;color:#33415c}
+.tgt-checks{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.tgt-checks label{cursor:pointer;display:inline-flex;align-items:center;gap:3px;font-size:13px;padding:2px 0}
+.tgt-checks label input[type=checkbox]{margin:0;accent-color:var(--cyan)}
+.tgt-count{display:flex;align-items:baseline;gap:6px;margin-top:6px;font-size:13px}
+.tgt-count .n{font-size:17px;font-weight:700;color:var(--navy)}
+.tgt-count .active{color:var(--cyan)}
+.tgt-badge{display:inline-block;font-size:11px;font-weight:600;padding:1px 8px;border-radius:999px;margin-left:6px}
+.tgt-badge.all{background:var(--mist);color:var(--slate)}
+.tgt-badge.filtered{background:#d8f6ff;color:#004f66}
+/* toast */
 #toast{position:fixed;top:70px;right:18px;background:var(--amber);color:var(--navy);font-weight:600;padding:10px 14px;border-radius:8px;font-size:13px;z-index:200;max-width:440px;box-shadow:0 6px 20px rgba(0,0,0,.25);transition:opacity .3s;opacity:0;pointer-events:none}
 </style>
 </head>
 <body>
-<header><span class="brand">Seg<b>OWL</b></span><span class="mission">ACME-2026 — prototype</span></header>
+<header><span class="brand">Seg<b>OWL</b></span><span class="mission">ACME-2026 — prototype v2</span></header>
 <nav>
   <a href="#">Overview</a><a href="#">Inventory</a><a href="#">Flow Policy</a><a class="on" href="#">Scans</a><a href="#">Report</a>
 </nav>
 <main>
 <h2>Scans</h2>
-<p class="sub">Pick a Scan Profile, adjust it, then download one script per Source and drop the results on its row.</p>
+<p class="sub">Pick a Scan Profile of the kit, adjust it if this Mission needs it, then download one script per Source
+and drop the results on its row.</p>
 
-<!-- Step 1 collapsed: just a placeholder, the prototype focuses on step 2 -->
-<div class="card" style="opacity:.5;padding:10px 16px">
-  <div class="stephead"><span class="stepn">1</span><b>Build the scan</b> <span class="small muted" style="margin-left:8px">profile: <b>Full TCP</b> — 65535 TCP ports, -Pn -sS -T4</span></div>
-</div>
+<!-- ============================================================ -->
+<!-- STEP 1: Build the scan (profile editor, with targeting)      -->
+<!-- ============================================================ -->
+<div class="card" id="build">
+  <div class="stephead">
+    <span class="stepn">1</span><b>Build the scan</b>
+    <span class="small muted">from a profile of the kit · <a href="#">all profiles</a></span>
+    <span style="margin-left:auto"><span class="status" id="st">Saved</span></span>
+  </div>
 
-<!-- Step 2: Sources × Profiles, with the new target filter -->
-<div class="card">
-  <div class="stephead"><span class="stepn">2</span><b>Run it from each Source</b>
-    <span class="small muted">one row per Source, one column per Scan Profile</span></div>
+  <!-- Profile selector -->
+  <div class="toolbar" style="margin-top:10px">
+    <select id="pf">
+      <option value="0">Full TCP</option>
+      <option value="1">Console scan</option>
+      <option value="2">iLO sweep</option>
+      <option value="3">Quick sweep</option>
+    </select>
+    <span class="small muted" id="pdesc">65535 TCP ports, every target</span>
+  </div>
 
-  <!-- ===== TARGET FILTER (new) ===== -->
-  <div class="filter-box" style="margin-top:10px">
-    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-      <b style="font-size:13px">Target filter</b>
-      <span class="small muted">restrict which inventory Machines are targeted</span>
+  <!-- Token line (simplified: just shows the nmap command shape) -->
+  <div class="tokenline" id="tl"></div>
+
+  <!-- Ports + Options: collapsed for prototype, focus on Targeting -->
+  <div class="layout" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin-top:12px">
+    <div class="card" style="border-color:#e6edf5"><b>Ports</b>
+      <div class="opt"><label class="t">Port Groups</label><div><span class="pill grp" style="background:#d8f6ff;color:#004f66;font-weight:600">admin</span> <span class="pill grp" style="background:#d8f6ff;color:#004f66;font-weight:600">all-tcp</span></div></div>
+      <div class="small muted" style="margin-top:6px">65535 TCP ports selected</div>
+    </div>
+    <div class="card" style="border-color:#e6edf5"><b>Options</b>
+      <div class="opt"><label class="t">TCP scan</label><div class="seg"><button class="on">SYN</button><button>Connect</button><button>ACK</button></div></div>
+      <div class="opt"><label class="t">Host discovery</label><div><label><input type="checkbox" checked disabled> -Pn skip discovery</label></div></div>
+      <div class="opt"><label class="t">Timing</label><div class="seg"><button>T2</button><button>T3</button><button class="on">T4</button><button>T5</button></div></div>
+      <div class="small" style="margin-top:8px"><b>Commands for Source</b>
+        <select id="src"><option>10.0.1.1</option><option>10.0.4.1</option></select>
+        <span class="muted" id="tcount"></span></div>
+      <pre class="cmd" id="cmd"></pre>
+    </div>
+  </div>
+
+  <!-- ===== TARGETING (new, per profile) ===== -->
+  <div class="tgt">
+    <div class="tgt-head">
+      <b>Targeting</b>
+      <span class="small muted">which Machines this profile scans — saved with the profile</span>
+      <span id="tgt-badge"></span>
       <span style="margin-left:auto">
-        <span class="small muted">combine:</span>
         <span class="seg" id="combine">
           <button class="on" data-v="or">OR</button>
           <button data-v="and">AND</button>
@@ -86,26 +141,38 @@ table.grid td.todo{background:#fbfcfe;color:#9aa3b2;text-align:center}
       </span>
     </div>
 
-    <div class="filter-row" style="margin-top:8px">
-      <span class="small" style="font-weight:600;min-width:50px">Zones</span>
-      <div id="zone-checks"></div>
+    <div class="tgt-row">
+      <span class="lbl">Zones</span>
+      <div class="tgt-checks" id="zone-checks"></div>
     </div>
 
-    <div class="filter-row">
-      <span class="small" style="font-weight:600;min-width:50px">Tags</span>
-      <div id="tag-checks"></div>
+    <div class="tgt-row">
+      <span class="lbl">Tags</span>
+      <div class="tgt-checks" id="tag-checks"></div>
     </div>
 
-    <div class="filter-count" id="count"></div>
+    <div class="tgt-count" id="count"></div>
   </div>
-  <!-- ===== END FILTER ===== -->
+  <!-- ===== END TARGETING ===== -->
+</div>
+
+<!-- ============================================================ -->
+<!-- STEP 2: Sources grid (reflects the active profile's targets) -->
+<!-- ============================================================ -->
+<div class="card">
+  <div class="stephead">
+    <span class="stepn">2</span><b>Run it from each Source</b>
+    <span class="small muted">one row per Source, one column per Scan Profile</span>
+  </div>
+  <p class="sub" style="margin-top:6px">A cell turns ✓ when the Scan it expects is in the folder. <b>Script</b> downloads
+  the script to run on that Source.</p>
 
   <div class="toolbar">
     <input type="search" id="cand" placeholder="Add a Source: type an IP, a name or a Zone" style="min-width:300px" disabled>
     <button class="btn pri" disabled>+ Add Source</button>
     <span class="sep"></span>
     <span class="small">Scripts for every Source, profile</span>
-    <select id="zp"><option>Full TCP</option><option>Quick sweep</option></select>
+    <select id="zp"><option>Full TCP</option><option>Console scan</option><option>iLO sweep</option><option>Quick sweep</option></select>
     <a class="btn" id="zip" href="#">Download (.zip)</a>
   </div>
 
@@ -116,43 +183,49 @@ table.grid td.todo{background:#fbfcfe;color:#9aa3b2;text-align:center}
 
 <script>
 "use strict";
-// ---- Fake inventory (8 zones, 24 machines, manual + derived tags)
+
+// ---- Fake data
 const ZONE_COLORS = [["#eff8ff","#1565c0","#0b3c75"],["#fff3ee","#8d6e63","#51352c"],["#f6f5ff","#7c4dff","#3c3072"],
   ["#eafafe","#1597ad","#00495e"],["#f5f5ff","#3d2a8a","#3a3173"],["#eafbfd","#80deea","#004954"],
   ["#eafbf9","#0b5f5a","#004944"],["#f7f5ff","#b9a6f2","#432e6f"]];
 const ZONES = ["Admin","DMZ","iLO","LAN Users","Monitoring","Servers","Wifi","OT"];
 const MACHINES = [
-  {ip:"10.0.1.1",  name:"fw-core",    zone:"Admin",      tags:["firewall"]},
-  {ip:"10.0.1.2",  name:"sw-core",    zone:"Admin",      tags:["switch"]},
-  {ip:"10.0.1.3",  name:"ad-dc01",    zone:"Admin",      tags:["windows","ad"]},
-  {ip:"10.0.1.4",  name:"ad-dc02",    zone:"Admin",      tags:["windows","ad"]},
-  {ip:"10.0.2.1",  name:"web-ext",    zone:"DMZ",        tags:["linux"]},
-  {ip:"10.0.2.2",  name:"mail-gw",    zone:"DMZ",        tags:["linux"]},
-  {ip:"10.0.2.3",  name:"vpn-gw",     zone:"DMZ",        tags:["appliance"]},
-  {ip:"10.0.3.1",  name:"ilo-srv01",  zone:"iLO",        tags:["ilo"]},
-  {ip:"10.0.3.2",  name:"ilo-srv02",  zone:"iLO",        tags:["ilo"]},
-  {ip:"10.0.3.3",  name:"ilo-srv03",  zone:"iLO",        tags:["ilo"]},
-  {ip:"10.0.3.4",  name:"idrac-db01", zone:"iLO",        tags:["idrac"]},
-  {ip:"10.0.4.1",  name:"pc-alice",   zone:"LAN Users",  tags:["windows"]},
-  {ip:"10.0.4.2",  name:"pc-bob",     zone:"LAN Users",  tags:["windows"]},
-  {ip:"10.0.4.3",  name:"pc-charlie", zone:"LAN Users",  tags:["linux"]},
-  {ip:"10.0.5.1",  name:"zabbix",     zone:"Monitoring", tags:["linux","monitoring"]},
-  {ip:"10.0.5.2",  name:"syslog",     zone:"Monitoring", tags:["linux","monitoring"]},
-  {ip:"10.0.6.1",  name:"srv-db01",   zone:"Servers",    tags:["linux","db"]},
-  {ip:"10.0.6.2",  name:"srv-app01",  zone:"Servers",    tags:["linux"]},
-  {ip:"10.0.6.3",  name:"srv-file01", zone:"Servers",    tags:["windows","fileserver"]},
-  {ip:"10.0.6.4",  name:"srv-hyper",  zone:"Servers",    tags:["vmware"]},
-  {ip:"10.0.7.1",  name:"wifi-ap01",  zone:"Wifi",       tags:["appliance"]},
-  {ip:"10.0.7.2",  name:"wifi-ap02",  zone:"Wifi",       tags:["appliance"]},
-  {ip:"10.0.8.1",  name:"plc-line1",  zone:"OT",         tags:["plc"]},
-  {ip:"10.0.8.2",  name:"hmi-op",     zone:"OT",         tags:["windows","hmi"]},
+  {ip:"10.0.1.1",name:"fw-core",zone:"Admin",tags:["firewall"]},
+  {ip:"10.0.1.2",name:"sw-core",zone:"Admin",tags:["switch"]},
+  {ip:"10.0.1.3",name:"ad-dc01",zone:"Admin",tags:["windows","ad"]},
+  {ip:"10.0.1.4",name:"ad-dc02",zone:"Admin",tags:["windows","ad"]},
+  {ip:"10.0.2.1",name:"web-ext",zone:"DMZ",tags:["linux"]},
+  {ip:"10.0.2.2",name:"mail-gw",zone:"DMZ",tags:["linux"]},
+  {ip:"10.0.2.3",name:"vpn-gw",zone:"DMZ",tags:["appliance"]},
+  {ip:"10.0.3.1",name:"ilo-srv01",zone:"iLO",tags:["ilo"]},
+  {ip:"10.0.3.2",name:"ilo-srv02",zone:"iLO",tags:["ilo"]},
+  {ip:"10.0.3.3",name:"ilo-srv03",zone:"iLO",tags:["ilo"]},
+  {ip:"10.0.3.4",name:"idrac-db01",zone:"iLO",tags:["idrac"]},
+  {ip:"10.0.4.1",name:"pc-alice",zone:"LAN Users",tags:["windows"]},
+  {ip:"10.0.4.2",name:"pc-bob",zone:"LAN Users",tags:["windows"]},
+  {ip:"10.0.4.3",name:"pc-charlie",zone:"LAN Users",tags:["linux"]},
+  {ip:"10.0.5.1",name:"zabbix",zone:"Monitoring",tags:["linux","monitoring"]},
+  {ip:"10.0.5.2",name:"syslog",zone:"Monitoring",tags:["linux","monitoring"]},
+  {ip:"10.0.6.1",name:"srv-db01",zone:"Servers",tags:["linux","db"]},
+  {ip:"10.0.6.2",name:"srv-app01",zone:"Servers",tags:["linux"]},
+  {ip:"10.0.6.3",name:"srv-file01",zone:"Servers",tags:["windows","fileserver"]},
+  {ip:"10.0.6.4",name:"srv-hyper",zone:"Servers",tags:["vmware"]},
+  {ip:"10.0.7.1",name:"wifi-ap01",zone:"Wifi",tags:["appliance"]},
+  {ip:"10.0.7.2",name:"wifi-ap02",zone:"Wifi",tags:["appliance"]},
+  {ip:"10.0.8.1",name:"plc-line1",zone:"OT",tags:["plc"]},
+  {ip:"10.0.8.2",name:"hmi-op",zone:"OT",tags:["windows","hmi"]},
 ];
-// Derived tags (from automations) — machine name -> tags
 const DERIVED = {"ad-dc01":["smb-signing-ok"],"ad-dc02":["smb-signing-ok"],"srv-db01":["db-exposed"],"web-ext":["ssl-weak"]};
 const SOURCES = ["10.0.1.1","10.0.4.1"];
-const PROFILES = [{name:"Full TCP", expected:["full-tcp"]},{name:"Quick sweep", expected:["quick"]}];
 
-// ---- All tags (manual + derived, deduplicated)
+// Profiles with saved targeting
+const PROFILES = [
+  {name:"Full TCP", desc:"65535 TCP ports, every target", ports:"-p1-65535", opts:"-Pn -sS -T4", zones:[], tags:[], combine:"or"},
+  {name:"Console scan", desc:"admin consoles only (tagged)", ports:"-p22,80,443,3389,5985", opts:"-Pn -sS -sV -T4", zones:[], tags:["ad","ilo","idrac"], combine:"or"},
+  {name:"iLO sweep", desc:"iLO/iDRAC zone, all ports", ports:"-p1-65535", opts:"-Pn -sS -T4", zones:["iLO"], tags:[], combine:"or"},
+  {name:"Quick sweep", desc:"top 1000, everything", ports:"--top-ports 1000", opts:"-Pn -sS -T4", zones:[], tags:[], combine:"or"},
+];
+
 function allTags() {
   const s = new Set();
   MACHINES.forEach(m => m.tags.forEach(t => s.add(t)));
@@ -160,25 +233,27 @@ function allTags() {
   return [...s].sort();
 }
 function machineTags(m) {
-  const dt = DERIVED[m.name] || [];
-  return [...new Set([...m.tags, ...dt])];
+  return [...new Set([...m.tags, ...(DERIVED[m.name] || [])])];
 }
-
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 function toast(msg){const t=document.getElementById("toast");t.textContent=msg;t.style.opacity=1;clearTimeout(t._h);t._h=setTimeout(()=>t.style.opacity=0,3000);}
+
+// ---- Profile state
+let curProfile = 0;
+
+function profile() { return PROFILES[curProfile]; }
 
 // ---- Build zone checkboxes
 function buildZones() {
   const box = document.getElementById("zone-checks");
   box.innerHTML = ZONES.map((z, i) => {
     const c = ZONE_COLORS[i % ZONE_COLORS.length];
-    return `<label><input type="checkbox" data-zone="${esc(z)}" checked>` +
+    return `<label><input type="checkbox" data-zone="${esc(z)}">` +
       `<span class="zonechip" style="border-color:${c[1]};color:${c[2]};background:${c[0]}">${esc(z)}</span></label>`;
   }).join(" ");
-  box.querySelectorAll("input").forEach(cb => cb.onchange = update);
+  box.querySelectorAll("input").forEach(cb => cb.onchange = onFilterChange);
 }
 
-// ---- Build tag checkboxes
 function buildTags() {
   const box = document.getElementById("tag-checks");
   const tags = allTags();
@@ -187,91 +262,171 @@ function buildTags() {
     const cls = derivedSet.has(t) ? "pill auto" : "pill";
     return `<label><input type="checkbox" data-tag="${esc(t)}"><span class="${cls}">${esc(t)}</span></label>`;
   }).join(" ");
-  box.querySelectorAll("input").forEach(cb => cb.onchange = update);
+  box.querySelectorAll("input").forEach(cb => cb.onchange = onFilterChange);
 }
+
+// ---- Load profile targeting into the UI
+function loadTargeting() {
+  const p = profile();
+  const savedZones = new Set(p.zones);
+  const savedTags = new Set(p.tags);
+  document.querySelectorAll("#zone-checks input").forEach(cb => {
+    cb.checked = savedZones.size === 0 || savedZones.has(cb.dataset.zone);
+  });
+  document.querySelectorAll("#tag-checks input").forEach(cb => {
+    cb.checked = savedTags.has(cb.dataset.tag);
+  });
+  document.querySelectorAll("#combine button").forEach(b => {
+    b.classList.toggle("on", b.dataset.v === (p.combine || "or"));
+  });
+}
+
+// ---- Save targeting back to profile (fake persistence)
+function saveTargeting() {
+  const p = profile();
+  const allChecked = [...document.querySelectorAll("#zone-checks input")].every(cb => cb.checked);
+  p.zones = allChecked ? [] : [...document.querySelectorAll("#zone-checks input:checked")].map(cb => cb.dataset.zone);
+  p.tags = [...document.querySelectorAll("#tag-checks input:checked")].map(cb => cb.dataset.tag);
+  p.combine = document.querySelector("#combine button.on").dataset.v;
+}
+
+function onFilterChange() {
+  saveTargeting();
+  updateCount();
+  updateTokenLine();
+  updateCmd();
+  renderGrid();
+  document.getElementById("st").textContent = "Modified";
+  document.getElementById("st").className = "status";
+}
+
+// ---- Matching logic
+function matchingMachines(p) {
+  p = p || profile();
+  const zones = p.zones, tags = p.tags, combine = p.combine || "or";
+  const noZoneFilter = zones.length === 0;
+  const noTagFilter = tags.length === 0;
+  if (noZoneFilter && noTagFilter) return MACHINES;
+  const zoneSet = new Set(zones);
+  const tagSet = new Set(tags);
+  return MACHINES.filter(m => {
+    const inZone = noZoneFilter || zoneSet.has(m.zone);
+    const hasTag = noTagFilter || machineTags(m).some(t => tagSet.has(t));
+    if (noZoneFilter) return hasTag;
+    if (noTagFilter) return inZone;
+    return combine === "and" ? (inZone && hasTag) : (inZone || hasTag);
+  });
+}
+
+function matchingIPs(src, p) {
+  const matched = matchingMachines(p);
+  const srcMachine = MACHINES.find(m => m.ip === src);
+  return matched.filter(m => m.name !== (srcMachine && srcMachine.name)).map(m => m.ip);
+}
+
+// ---- Update displays
+function updateCount() {
+  const matched = matchingMachines();
+  const machines = new Set(matched.map(m => m.name));
+  const p = profile();
+  const isAll = p.zones.length === 0 && p.tags.length === 0;
+  const el = document.getElementById("count");
+  const badge = document.getElementById("tgt-badge");
+  if (isAll) {
+    el.innerHTML = `<span class="n">${machines.size}</span> Machines · <span class="n">${matched.length}</span> Interfaces`;
+    badge.innerHTML = `<span class="tgt-badge all">all</span>`;
+  } else {
+    el.innerHTML = `<span class="n active">${machines.size}</span> Machines · <span class="n active">${matched.length}</span> Interfaces matching`;
+    badge.innerHTML = `<span class="tgt-badge filtered">filtered</span>`;
+  }
+}
+
+function updateTokenLine() {
+  const p = profile();
+  const tgt = p.zones.length === 0 && p.tags.length === 0
+    ? "all targets"
+    : (p.zones.length ? p.zones.join(", ") : "") + (p.zones.length && p.tags.length ? " " + p.combine.toUpperCase() + " " : "") + (p.tags.length ? p.tags.map(t => "#" + t).join(", ") : "");
+  document.getElementById("tl").innerHTML =
+    `<span class="tok">nmap</span>` +
+    p.ports.split(/\s+/).map(t => `<span class="tok port">${esc(t)}</span>`).join("") +
+    p.opts.split(/\s+/).map(t => `<span class="tok opt">${esc(t)}</span>`).join("") +
+    `<span class="tok fixed">-iL &lt;targets&gt; -oA scans/&lt;source&gt;/${esc(p.name)}</span>` +
+    `<span class="tok" style="background:#0b4f5a;color:#65e3ff;margin-left:auto" title="saved targeting">${esc(tgt)}</span>`;
+}
+
+function updateCmd() {
+  const p = profile(), src = document.getElementById("src").value;
+  const targets = matchingIPs(src);
+  document.getElementById("tcount").textContent = `${targets.length} targets` + (p.zones.length || p.tags.length ? " (filtered)" : " (inventory minus Self)");
+  document.getElementById("cmd").textContent = `nmap ${p.ports} ${p.opts} -iL targets/${src}-${p.name}.txt -oA scans/${src}/${p.name}`;
+}
+
+function updateDesc() {
+  const p = profile();
+  document.getElementById("pdesc").textContent = p.desc;
+}
+
+// ---- Profile switching
+document.getElementById("pf").onchange = () => {
+  curProfile = parseInt(document.getElementById("pf").value);
+  loadTargeting();
+  updateCount();
+  updateTokenLine();
+  updateCmd();
+  updateDesc();
+  document.getElementById("st").textContent = "Saved";
+  document.getElementById("st").className = "status ok";
+  renderGrid();
+};
 
 // ---- AND/OR toggle
 document.getElementById("combine").onclick = e => {
   const btn = e.target.closest("button");
   if (!btn) return;
   document.querySelectorAll("#combine button").forEach(b => b.classList.toggle("on", b === btn));
-  update();
+  onFilterChange();
 };
 
-// ---- Compute matching machines
-function getFilter() {
-  const zones = [...document.querySelectorAll("#zone-checks input:checked")].map(cb => cb.dataset.zone);
-  const tags = [...document.querySelectorAll("#tag-checks input:checked")].map(cb => cb.dataset.tag);
-  const combine = document.querySelector("#combine button.on").dataset.v;
-  const allZonesChecked = zones.length === ZONES.length;
-  const noTags = tags.length === 0;
-  return {zones, tags, combine, allZonesChecked, noTags};
-}
+// ---- Source selector
+document.getElementById("src").onchange = updateCmd;
 
-function matchingMachines() {
-  const {zones, tags, combine, allZonesChecked, noTags} = getFilter();
-  // Default: everything (all zones checked, no tags) → no filtering
-  if (allZonesChecked && noTags) return MACHINES;
-  // Build predicates only for axes that are set
-  const zoneSet = new Set(zones);
-  const tagSet = new Set(tags);
-  const hasZoneFilter = !allZonesChecked;
-  const hasTagFilter = !noTags;
-  return MACHINES.filter(m => {
-    const inZone = !hasZoneFilter || zoneSet.has(m.zone);
-    const hasTag = !hasTagFilter || machineTags(m).some(t => tagSet.has(t));
-    if (!hasZoneFilter) return hasTag;
-    if (!hasTagFilter) return inZone;
-    return combine === "and" ? (inZone && hasTag) : (inZone || hasTag);
-  });
-}
-
-function matchingIPs(src) {
-  const matched = matchingMachines();
-  const srcMachine = MACHINES.find(m => m.ip === src);
-  return matched.filter(m => m.name !== (srcMachine && srcMachine.name)).map(m => m.ip);
-}
-
-// ---- Update count + grid
-function update() {
-  const matched = matchingMachines();
-  const machines = new Set(matched.map(m => m.name));
-  const interfaces = matched.length;
-  const {allZonesChecked, noTags} = getFilter();
-  const active = !allZonesChecked || !noTags;
-  const el = document.getElementById("count");
-  if (!active) {
-    el.innerHTML = `<span class="n">${machines.size}</span> Machines · <span class="n">${interfaces}</span> Interfaces <span class="muted small">(no filter: full inventory)</span>`;
-  } else {
-    el.innerHTML = `<span class="n">${machines.size}</span> Machines · <span class="n">${interfaces}</span> Interfaces matching`;
-  }
-  renderGrid();
-}
-
+// ---- Grid
 function renderGrid() {
   const grid = document.getElementById("grid");
-  if (!SOURCES.length) { grid.innerHTML = `<tr><td class="muted" style="padding:16px">No Source yet.</td></tr>`; return; }
-  grid.innerHTML = `<tr><th>Source</th>${PROFILES.map(p => `<th>${esc(p.name)}</th>`).join("")}<th>Targets</th></tr>`
-    + SOURCES.map(src => {
-      const m = MACHINES.find(x => x.ip === src);
-      const targets = matchingIPs(src);
-      return `<tr><td><b>${esc(src)}</b>${m ? " · " + esc(m.name) : ""}<div class="small muted">${m ? esc(m.zone) : ""}</div></td>`
-        + PROFILES.map(p => `<td class="todo"><a class="btn sm" href="#" onclick="toast('Script for ${esc(src)} × ${esc(p.name)}: ${targets.length} targets');return false">⬇ Script</a></td>`).join("")
-        + `<td class="small">${targets.length} targets ${targets.length < MACHINES.length - 1 ? '<span style="color:var(--amber);font-weight:600">(filtered)</span>' : ""}</td></tr>`;
-    }).join("");
+  grid.innerHTML = `<tr><th>Source</th>${PROFILES.map(p => {
+    const isAll = p.zones.length === 0 && p.tags.length === 0;
+    return `<th>${esc(p.name)}${isAll ? "" : ` <span class="tgt-badge filtered" style="font-weight:400">filtered</span>`}</th>`;
+  }).join("")}</tr>`
+  + SOURCES.map(src => {
+    const m = MACHINES.find(x => x.ip === src);
+    return `<tr><td><b>${esc(src)}</b>${m ? " · " + esc(m.name) : ""}<div class="small muted">${m ? esc(m.zone) : ""}</div></td>`
+      + PROFILES.map(p => {
+        const targets = matchingIPs(src, p);
+        return `<td class="todo"><div class="small muted">${targets.length} targets</div><a class="btn sm" href="#" onclick="toast('${esc(p.name)} for ${esc(src)}: ${targets.length} targets');return false">⬇ Script</a></td>`;
+      }).join("") + `</tr>`;
+  }).join("");
 }
 
-// ---- Zip link
+// ---- Zip
 document.getElementById("zip").onclick = e => {
   e.preventDefault();
-  const matched = matchingMachines();
-  toast(`Zip with ${matched.length} target Machines × ${SOURCES.length} Sources`);
+  const sel = document.getElementById("zp").value;
+  const p = PROFILES.find(x => x.name === sel) || PROFILES[0];
+  const matched = matchingMachines(p);
+  toast(`Zip for ${p.name}: ${matched.length} target Machines × ${SOURCES.length} Sources`);
 };
 
 // ---- Init
 buildZones();
 buildTags();
-update();
+loadTargeting();
+updateCount();
+updateTokenLine();
+updateCmd();
+updateDesc();
+renderGrid();
+document.getElementById("st").textContent = "Saved";
+document.getElementById("st").className = "status ok";
 </script>
 </body>
 </html>
