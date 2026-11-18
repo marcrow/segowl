@@ -64,12 +64,29 @@ def _tokenize(text: str) -> list[str]:
     return tokens
 
 
+class _HasNode:
+    """Machine-level predicate: true for all observations of a machine if any matches inner."""
+
+    __slots__ = ("inner", "_machines")
+
+    def __init__(self, inner):
+        self.inner = inner
+        self._machines: set[str] = set()
+
+    def bind(self, observations: list[dict]):
+        self._machines = {obs["machine"] for obs in observations if self.inner(obs)}
+
+    def __call__(self, obs):
+        return obs["machine"] in self._machines
+
+
 @dataclass
 class _Parser:
     tokens: list[str]
     pos: int = 0
     depth: int = 0
     fields_used: set[str] = field(default_factory=set)
+    has_nodes: list[_HasNode] = field(default_factory=list)
 
     def peek(self) -> str | None:
         return self.tokens[self.pos] if self.pos < len(self.tokens) else None
@@ -120,6 +137,18 @@ class _Parser:
             self.eat(")")
             self.depth -= 1
             return node
+        if t and t.lower() == "has":
+            self.eat()
+            self.depth += 1
+            if self.depth > MAX_DEPTH:
+                raise ParseError(f"nesting depth > {MAX_DEPTH}")
+            self.eat("(")
+            inner = self.parse_or()
+            self.eat(")")
+            self.depth -= 1
+            node = _HasNode(inner)
+            self.has_nodes.append(node)
+            return node
         f = self.eat()
         if f.lower() not in FIELDS:
             raise ParseError(f"unknown field {f!r}")
@@ -169,10 +198,28 @@ def _comparison(f: str, op: str, val: str):
     return lambda obs, _f=f, _v=val: _v not in obs[_f] if _f == "tag" else obs[_f] != _v
 
 
+class _BoundPred:
+    """Callable wrapper that exposes bind() for has() nodes."""
+
+    __slots__ = ("_fn", "_has_nodes")
+
+    def __init__(self, fn, has_nodes):
+        self._fn = fn
+        self._has_nodes = has_nodes
+
+    def __call__(self, obs):
+        return self._fn(obs)
+
+    def bind(self, observations: list[dict]):
+        for node in self._has_nodes:
+            node.bind(observations)
+
+
 def parse_condition(text: str) -> tuple[callable, set[str]]:
     """Parse a condition string into (predicate, fields_used).
 
     The predicate takes a dict with keys: port, state, protocol, zone, machine, tag (list[str]).
+    Call pred.bind(observations) before evaluation when the condition uses has().
     """
     text = text.strip()
     if not text:
@@ -186,7 +233,7 @@ def parse_condition(text: str) -> tuple[callable, set[str]]:
     pred = p.parse_or()
     if p.pos < len(p.tokens):
         raise ParseError(f"unexpected token {p.tokens[p.pos]!r}")
-    return pred, p.fields_used
+    return _BoundPred(pred, p.has_nodes), p.fields_used
 
 
 def is_portable(fields_used: set[str]) -> bool:
@@ -346,23 +393,31 @@ def run_automations(
     excluded_grouped: set[tuple[str, str, str]] = set()
     warnings: list[str] = []
 
-    # phase 1: tag automations on raw observations
+    # phase 1: tag automations – chained (order in automations.ini matters)
     tag_autos = [a for a in automations if a.action == "tag"]
     for a in tag_autos:
         pred, _ = parse_condition(a.condition)
+        pred.bind(observations)
         matched_machines: set[str] = set()
         for obs in observations:
             if pred(obs):
                 matched_machines.add(obs["machine"])
+        if not matched_machines:
+            continue
         for m in matched_machines:
             derived_tags.setdefault(m, set()).add(a.tag)
+        for obs in observations:
+            dt = derived_tags.get(obs["machine"])
+            if dt:
+                obs["tag"] = list(set(obs["tag"]) | dt)
 
-    # phase 2: exclusion automations (manual tags only, no chaining per spec rule 6)
+    # phase 2: exclusion automations (derived tags visible)
     excl_autos = [a for a in automations if a.action == "exclude"]
     open_excluded = 0
     exclusion_stats: list[ExclusionStats] = []
     for a in excl_autos:
         pred, _ = parse_condition(a.condition)
+        pred.bind(observations)
         count = 0
         zones: set[str] = set()
         for obs in observations:

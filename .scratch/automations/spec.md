@@ -70,7 +70,8 @@ state = closed and port = 161 and protocol = udp
 3. Exclusion Automations run after tag Automations. An excluded observation is removed from the analysis.
 4. Verdicts are recomputed after exclusions. If all observations of a Source → Interface pair are excluded, the verdict is EXCLUDED. If a host answered discovery and all its ports are excluded, the verdict is ALIVE (discovery is not a port observation).
 5. Exclusions on `state = open` are allowed but trigger a warning: "this Automation masks N Findings and M Pivot Machines".
-6. No Automation depends on a tag computed by another Automation in the same run (no chaining).
+6. Tag Automations are **chained**: a derived tag from one Automation is visible to subsequent Automations (order in `automations.ini` matters). Derived tags are also visible to exclusion Automations.
+7. `has(…)` is a machine-level predicate: true for all observations of a Machine when any of its observations matches the inner condition. Enables multi-port AND conditions (e.g. `has(port = 445 and state = open) and has(port = 139 and state = open)`).
 7. Exclusions propagate everywhere: matrix, per-source, per-target, Findings, Diff, exports.
 
 ## Execution

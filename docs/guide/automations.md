@@ -32,18 +32,20 @@ The same approach works for any family:
 - `state = open or state = closed` → tag `responded`: under `-Pn`, Machines that answered on at least one
   port, then target `responded` for a deeper pass rather than the whole range again.
 
-!!! tip "OR between ports, AND via chaining"
+!!! tip "OR between ports, AND with `has()`"
     A condition is tested against one port observation at a time. `port = 445 and port = 3389` is always
     false (one observation cannot be two ports). To tag Machines that have **either** port, use OR:
     `(port = 445 or port = 3389) and state = open`.
 
-    To tag Machines that have **both** ports open, chain three tag Automations (order matters):
+    To tag Machines that have **both** ports open, use `has()`:
 
-    1. `port = 445 and state = open` → tag `has-smb`
-    2. `port = 3389 and state = open` → tag `has-rdp`
-    3. `tag = has-smb and tag = has-rdp` → tag `windows`
+    ```
+    has(port = 445 and state = open) and has(port = 139 and state = open)
+    ```
 
-    Each tag Automation sees the derived tags of the ones above it.
+    `has(…)` means "the Machine has at least one observation that matches". It can be combined with
+    per-observation terms: `has(…) and port = 80` matches port 80 observations only on Machines
+    where the `has()` part is true.
 
 ### Suppress firewall noise with Exclude
 
@@ -56,18 +58,17 @@ state = closed and zone = Admin        → exclude: closed ports in the Admin Zo
 port = 161 and protocol = udp          → exclude: SNMP noise everywhere
 ```
 
-**Example: suppress iLO firewall noise with chaining.**
+**Example: suppress iLO firewall noise.**
 
 A firewall sends a TCP reset on port 17988 (iLO HTTP) but filters 17990 (iLO HTTPS). The pattern
-17988 closed + 17990 filtered is noise — `closed` on 17988 alone is not meaningful.
+17988 closed + 17990 filtered is noise — `closed` on 17988 alone is not meaningful. One exclude
+Automation handles it:
 
-| # | Automation | Condition | Action |
-|---|---|---|---|
-| 1 | ilo-http | `port = 17988 and state = closed` | tag `ilo-closed` |
-| 2 | ilo-https | `port = 17990 and state = filtered` | tag `ilo-filt` |
-| 3 | ilo-noise | `(tag = ilo-closed and tag = ilo-filt) and (port = 17988 or port = 17990)` | exclude |
+```
+has(port = 17988 and state = closed) and has(port = 17990 and state = filtered) and (port = 17988 or port = 17990)
+```
 
-Automation 3 sees the derived tags from 1 and 2 (chaining). The port filter in the condition limits the
+The two `has()` clauses select Machines with the iLO noise pattern. The `port = …` filter limits the
 exclusion to 17988 and 17990 — other ports on the same Machine are not affected. A Machine that has only
 17988 closed (without 17990 filtered) is not excluded.
 
@@ -90,11 +91,22 @@ simple conditions). **Test** shows how many observations match before you save.
 | `protocol` | tcp, udp |
 | `zone` | Zone names from the inventory |
 | `machine` | Machine names from the inventory |
-| `tag` | Machine Tags (manual only; derived tags are not visible to other Automations) |
+| `tag` | Machine Tags (manual or derived from earlier tag Automations) |
 
 ### Operators
 
 `=`, `!=`, `and`, `or`, parentheses. Names with spaces must be quoted: `zone = "Server Room"`.
+
+### `has()` — machine-level condition
+
+`has(…)` is true for a Machine when **any** of its observations matches the inner condition. Use it to
+express AND between different ports:
+
+```
+has(port = 445 and state = open) and has(port = 3389 and state = open)
+```
+
+`has()` mixes with per-observation terms. Without `has()`, each comparison tests a single observation.
 
 ### Examples
 
@@ -102,8 +114,9 @@ simple conditions). **Test** shows how many observations match before you save.
 (port = 3389 or port = 445 or port = 5985) and state = open
 (port = 80 or port = 443) and state = open
 state = closed and zone = Admin
-state = closed and port = 161 and protocol = udp
+port = 161 and protocol = udp
 machine = "FW-01" and state = filtered
+has(port = 445 and state = open) and has(port = 139 and state = open)
 ```
 
 !!! tip "Add `state = open` for tagging"

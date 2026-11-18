@@ -765,6 +765,12 @@ class Mission:
                 if src in inv:
                     scans_dict[src] = [parse_scan(p, src) for p in paths]
         obs = extract_observations(inv, scans_dict)
+        dt = self._derived_tags()
+        for o in obs:
+            m_tags = dt.get(o["machine"])
+            if m_tags:
+                o["tag"] = list(set(o["tag"]) | set(m_tags))
+        pred.bind(obs)
         matches = [o for o in obs if pred(o)]
         machines = sorted({o["machine"] for o in matches})
         return {"matches": len(matches), "machines": machines}
@@ -774,7 +780,13 @@ class Mission:
         rows = self.rows()
         zones = sorted({r.get("zone", "") for r in rows if r.get("zone")})
         machines = sorted({r.get("name") or r["ip"] for r in rows})
-        tags = sorted({t for r in rows for t in (r.get("tags") or "").split(",") if t.strip()})
+        manual = {t for r in rows for t in (r.get("tags") or "").split(",") if t.strip()}
+        try:
+            autos = load_automations(self.file("automations.ini"))
+            auto_tags = {a.tag for a in autos if a.action == "tag" and a.tag}
+        except (ValueError, OSError):
+            auto_tags = set()
+        tags = sorted(manual | auto_tags)
         return {"zones": zones, "machines": machines, "tags": tags}
 
     # ---- Sources, targets, Scans

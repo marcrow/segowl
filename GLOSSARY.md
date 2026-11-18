@@ -95,7 +95,7 @@ Every port observation of this Source → Interface pair was removed by Automati
 ### Automation
 
 **Automation**:
-A named, persistent condition → action entry stored in `automations.ini`. The condition is a boolean expression over observation fields (port, state, protocol, Zone, Machine, Machine Tag). Two action types: **tag** (compute a derived Machine Tag) and **exclude** (remove matching port observations from the analysis). Tag Automations run on raw observations first, then exclusion Automations. An Automation whose condition references only ports, states, protocols and Machine Tags (no Zone or Machine name) is portable and may live in the Auditor Kit.
+A named, persistent condition → action entry stored in `automations.ini`. The condition is a boolean expression over observation fields (port, state, protocol, Zone, Machine, Machine Tag). Two action types: **tag** (compute a derived Machine Tag) and **exclude** (remove matching port observations from the analysis). Tag Automations run first, in order, and are **chained**: each one sees the derived tags of the ones above it. Exclusion Automations run second and see all derived tags. An Automation whose condition references only ports, states, protocols and Machine Tags (no Zone or Machine name) is portable and may live in the Auditor Kit.
 _Avoid_: rule (see Flow Policy), filter
 
 ### Result

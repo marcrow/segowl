@@ -97,6 +97,145 @@ def test_port_80_and_443_always_false():
     assert not pred(_obs(port=443))
 
 
+def test_tag_chaining():
+    """A tag Automation can reference a derived tag from a previous one."""
+    inv = load_inventory(str(MISSION / "inventory.csv"))
+    scans = {
+        "172.31.250.1": [
+            Scan(
+                path="x.xml",
+                source="172.31.250.1",
+                hosts={
+                    "172.31.250.10": HostRecord(
+                        state="up", ports=[(445, "tcp", "open"), (3389, "tcp", "open")]
+                    ),
+                    "172.31.250.20": HostRecord(
+                        state="up", ports=[(445, "tcp", "open"), (5432, "tcp", "open")]
+                    ),
+                },
+            )
+        ]
+    }
+    autos = [
+        Automation("smb", "tag", "port = 445 and state = open", "has-smb"),
+        Automation("rdp", "tag", "port = 3389 and state = open", "has-rdp"),
+        Automation("win", "tag", "tag = has-smb and tag = has-rdp", "windows"),
+    ]
+    result = run_automations(autos, inv, scans)
+    assert "windows" in result.derived_tags.get("app-01", set())
+    assert "windows" not in result.derived_tags.get("db-01", set())
+
+
+def test_derived_tag_in_exclude():
+    """An exclude Automation can reference derived tags to target specific machines."""
+    inv = load_inventory(str(MISSION / "inventory.csv"))
+    scans = {
+        "172.31.250.1": [
+            Scan(
+                path="x.xml",
+                source="172.31.250.1",
+                hosts={
+                    "172.31.250.10": HostRecord(
+                        state="up", ports=[(17988, "tcp", "closed"), (17990, "tcp", "filtered")]
+                    ),
+                    "172.31.250.20": HostRecord(
+                        state="up", ports=[(17988, "tcp", "closed"), (5432, "tcp", "open")]
+                    ),
+                },
+            )
+        ]
+    }
+    autos = [
+        Automation("ilo-http", "tag", "port = 17988 and state = closed", "ilo-closed"),
+        Automation("ilo-https", "tag", "port = 17990 and state = filtered", "ilo-filt"),
+        Automation(
+            "ilo-noise", "exclude", "(tag = ilo-closed and tag = ilo-filt) and (port = 17988 or port = 17990)"
+        ),
+    ]
+    result = run_automations(autos, inv, scans)
+    # app-01 has both → 17988 and 17990 excluded
+    assert ("172.31.250.1", "172.31.250.10", 17988, "tcp") in result.excluded
+    assert ("172.31.250.1", "172.31.250.10", 17990, "tcp") in result.excluded
+    # db-01 has only 17988 closed, not 17990 filtered → not excluded
+    assert ("172.31.250.1", "172.31.250.20", 17988, "tcp") not in result.excluded
+
+
+def test_has_parses():
+    pred, fields = parse_condition("has(port = 445 and state = open)")
+    assert callable(pred)
+    assert "port" in fields and "state" in fields
+
+
+def test_has_tag_automation():
+    """has() enables multi-port AND at machine level in one rule."""
+    inv = load_inventory(str(MISSION / "inventory.csv"))
+    scans = {
+        "172.31.250.1": [
+            Scan(
+                path="x.xml",
+                source="172.31.250.1",
+                hosts={
+                    "172.31.250.10": HostRecord(
+                        state="up", ports=[(445, "tcp", "open"), (139, "tcp", "open")]
+                    ),
+                    "172.31.250.20": HostRecord(
+                        state="up", ports=[(445, "tcp", "open"), (5432, "tcp", "open")]
+                    ),
+                },
+            )
+        ]
+    }
+    autos = [
+        Automation(
+            "win",
+            "tag",
+            "has(port = 445 and state = open) and has(port = 139 and state = open)",
+            "windows",
+        ),
+    ]
+    result = run_automations(autos, inv, scans)
+    assert "windows" in result.derived_tags.get("app-01", set())
+    assert "windows" not in result.derived_tags.get("db-01", set())
+
+
+def test_has_exclude():
+    """has() in exclude: target machines by multi-port pattern, limit excluded ports."""
+    inv = load_inventory(str(MISSION / "inventory.csv"))
+    scans = {
+        "172.31.250.1": [
+            Scan(
+                path="x.xml",
+                source="172.31.250.1",
+                hosts={
+                    "172.31.250.10": HostRecord(
+                        state="up",
+                        ports=[(17988, "tcp", "closed"), (17990, "tcp", "filtered"), (80, "tcp", "open")],
+                    ),
+                    "172.31.250.20": HostRecord(
+                        state="up", ports=[(17988, "tcp", "closed"), (5432, "tcp", "open")]
+                    ),
+                },
+            )
+        ]
+    }
+    autos = [
+        Automation(
+            "ilo",
+            "exclude",
+            "has(port = 17988 and state = closed) and has(port = 17990 and state = filtered)"
+            " and (port = 17988 or port = 17990)",
+        ),
+    ]
+    result = run_automations(autos, inv, scans)
+    # app-01 matches the has() pattern → 17988 and 17990 excluded
+    assert ("172.31.250.1", "172.31.250.10", 17988, "tcp") in result.excluded
+    assert ("172.31.250.1", "172.31.250.10", 17990, "tcp") in result.excluded
+    # port 80 on app-01 NOT excluded (port filter limits scope)
+    assert ("172.31.250.1", "172.31.250.10", 80, "tcp") not in result.excluded
+    # db-01 missing 17990 filtered → nothing excluded
+    assert ("172.31.250.1", "172.31.250.20", 17988, "tcp") not in result.excluded
+
+
 def test_state_closed_and_zone():
     pred, _ = parse_condition("state = closed and zone = Admin")
     assert pred(_obs(state="closed", zone="Admin"))
