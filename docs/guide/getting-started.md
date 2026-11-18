@@ -39,9 +39,10 @@ order:
 | Menu | What you do there |
 |---|---|
 | **Overview** | Where you stand: the checklist of the audit path. |
-| **Inventory & Zones** | Paste or edit the inventory, take the names from the Scans. |
+| **Inventory & Zones** | Paste or edit the inventory, assign Machine Tags, take the names from the Scans. |
 | **Auditor Kit** | Your tooling, carried from Mission to Mission: Scan Profiles, Port Groups, Port Labels, Kits. |
-| **Scans** | Build the nmap command, download one script per Source, drop the results. |
+| **Scans** | Build the nmap command, target by Zone or Tag, download one script per Source, drop the results. |
+| **Automations** | Tag Machines or exclude observations based on Scan results. |
 | **Flow Policy** | Decide, Zone by Zone, what may cross. |
 | **Report** | The report, regenerated whenever a Mission file changes. |
 

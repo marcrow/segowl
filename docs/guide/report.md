@@ -41,12 +41,16 @@ Machine has its own colour; single-interface Machines stay white.
 | **Pivot Machines** | Machines spanning several Zones that a Source reaches: one hop into their other Zones |
 | **Per source** | What each Source reaches |
 | **Per target** | Who reaches each target |
-| **Scans** | Every Scan, Coverage, anomalies, and the Exclusion Automations section (match counts, affected Zones) |
+| **Scans** | Every Scan, Coverage, anomalies, and the [Exclusion Automations](automations.md) section (match counts, affected Zones) |
 | **Diff** | Before / after, Source vs Source |
 
 The **Port Group** chips filter every tab at once. Matrix cells show in a tooltip the Scans behind their
 verdict. The **Show exclusions** toggle reveals excluded ports and masked Findings greyed out in every table
 (state saved in localStorage). Diagrams, Pivot cards and Diff are not affected.
+
+**Derived tags** from [Automations](automations.md) appear as extra columns in the inventory tables (Global
+view, Per source, Per target) alongside manual tags. When exclusion Automations mask open observations, the
+report metadata warns about hidden Findings and Pivot Machines.
 
 ### Retest: the Diff tab
 

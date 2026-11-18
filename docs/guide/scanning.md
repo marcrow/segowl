@@ -1,7 +1,7 @@
 # Scanning from each Source
 
-A **Source** is the IP you scan from. Every Source runs the same profile against the whole inventory minus its
-own Machine (**Self**): the coverage is complete the first time.
+A **Source** is the IP you scan from. Every Source runs the same profile against the inventory minus its own
+Machine (**Self**), optionally filtered by [scan targeting](#scan-targeting).
 
 ![Several Sources fanning out over the whole inventory](../img/tutorial/several-sources.svg)
 
@@ -15,9 +15,38 @@ command is shown live.
 - **Ports**: tick Port Groups, add nmap top ports, or search ports by product, tag or vendor (`veeam`, `oob`,
   `ldap`, `udp:161`…) in the Port Labels and the IANA registry.
 - **Options**: each nmap option explained (SYN or connect, `-Pn`, timing, retries, rates, `-sV`, NSE scripts).
-- **Commands for Source**: targets always come from the inventory, minus the Source's Machine.
+- **Commands for Source**: targets come from the inventory, minus the Source's Machine. With targeting, only
+  the matching subset.
 
 Then download **one script per Source** and run it there.
+
+## Scan targeting
+
+A Scan Profile can target a subset of the inventory instead of everything, using **Zones** and **Machine
+Tags** as filters. The targeting section sits below Ports and Options in the profile editor.
+
+- **Zone checkboxes**: tick the Zones to include.
+- **Tag checkboxes**: tick the Machine Tags (manual or derived) to include.
+- **AND / OR toggle**: AND = Machines in a ticked Zone **and** carrying a ticked tag. OR = Machines in a
+  ticked Zone **or** carrying a ticked tag. Default: AND.
+- Untouched (all Zones checked, no tags): the whole inventory, same as before.
+
+The filter applies to the scripts and to the zip export. Each profile carries its own targeting
+(`scan_targeting.csv` in the Mission folder), so "Broad TCP" can target everything while "Windows deep"
+targets only `tag = probably-windows`. Targeting is per Mission (Zones and tags are client data): it does
+not travel in a Kit.
+
+### Use cases
+
+**Zone-specific profile**: an "iLO sweep" profile targeting only the iLO Zone with iLO-specific ports (623,
+17990), while "Broad TCP" keeps the whole inventory.
+
+**Tag-driven second pass**: after a first sweep, an Automation tags Machines from results (e.g.
+`probably-windows`), and a "Windows deep" profile targets `tag = probably-windows` with Windows ports. See
+[Automations: progressive scanning](automations.md#progressive-scanning-with-tags).
+
+**Manual tag**: tag admin jump hosts `admin` by hand in the inventory, then create an "Admin deep" profile
+targeting `tag = admin` with admin-specific ports and scripts.
 
 ## Run on site, drop the results
 

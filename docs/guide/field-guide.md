@@ -33,6 +33,21 @@ Best practices for using SegOWL, step by step. How you run your engagement stays
 - Something deserves a closer look? Add a Scan to that Source (more ports, `-sV`, one target): it joins the
   Source View, nothing to redo.
 
+## Progressive scanning
+
+After the first sweep, Automations let you tag Machines from results and scan deeper on the right subset:
+
+1. **Broad sweep** with `-Pn` and your usual profile across the whole inventory.
+2. **Automate**: `(port = 3389 or port = 445) and state = open` → tag `probably-windows`;
+   `(port = 80 or port = 443) and state = open` → tag `web-server`;
+   `state = open or state = closed` → tag `responded` (useful when ping is blocked).
+3. **Targeted profiles**: a "Windows deep" profile targeting `tag = probably-windows` with Windows-specific
+   ports, a "Web deep" profile targeting `tag = web-server` with web ports. Only the matching Machines are in
+   the script.
+4. **Second scan**, download and run. The new results join each Source View automatically.
+
+See [Automations](automations.md) and [Scan targeting](scanning.md#scan-targeting).
+
 ## Names before the Flow Policy
 
 Take the names from the Scans (**Inventory › Names from Scans**) **before** writing the Flow Policy:

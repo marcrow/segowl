@@ -20,10 +20,11 @@ New here? Read the [philosophy](guide/philosophy.md) and the [field guide](guide
 Each step has its page:
 
 1. [Getting started](guide/getting-started.md): install, the demo, the app.
-2. [The Mission folder](guide/mission-folder.md): the inventory, Zones, Machines, names from the Scans.
-3. [Scanning from each Source](guide/scanning.md): the scan builder, running on site, dropping the results.
-4. [Auditor Kit](guide/auditor-kit.md): Scan Profiles, Port Groups, Port Labels, Kits.
-5. [Flow Policy](guide/flow-policy.md): what may cross, Findings and undeclared flows.
-6. [Reading the report](guide/report.md): verdicts, views, Diff, Pivot Machines, outputs.
+2. [The Mission folder](guide/mission-folder.md): the inventory, Zones, Machines, Machine Tags, names from the Scans.
+3. [Scanning from each Source](guide/scanning.md): the scan builder, scan targeting by Zone or Tag, running on site, dropping the results.
+4. [Auditor Kit](guide/auditor-kit.md): Scan Profiles, Port Groups, Port Labels, portable Automations, Kits.
+5. [Automations](guide/automations.md): tag Machines or exclude observations based on Scan results.
+6. [Flow Policy](guide/flow-policy.md): what may cross, Findings and undeclared flows.
+7. [Reading the report](guide/report.md): verdicts, views, Diff, Pivot Machines, outputs.
 
 All the gestures on one page: [Shortcuts](guide/shortcuts.md). No client network at hand? The [lab](guide/lab.md) rebuilds one with Docker.

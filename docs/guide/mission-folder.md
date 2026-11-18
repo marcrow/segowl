@@ -5,9 +5,11 @@ engagement, to copy, to compare (see [ADR 0003](../adr/0003-mission-folder-is-th
 
 ```
 mission/
-  inventory.csv            ip;zone;type;name
+  inventory.csv            ip;zone;type;name;tags
   port_groups.csv          optional, overrides the default Port Groups
   flow_policy.csv          optional, the expected flows
+  automations.ini          optional, condition → action rules
+  scan_targeting.csv       optional, per-profile Zone/Tag targeting
   scans/<source_ip>/*.xml  any file name, one folder per Source
   report/                  generated
 ```
@@ -42,10 +44,20 @@ One row per Interface, the same name:
 A Machine spanning several Zones that a Source reaches is a **Pivot Machine**: a one-hop path from the
 Source's Zone to its other Zones. The report lists them.
 
+### Machine Tags
+
+The `tags` column labels a Machine for grouping: `windows`, `admin`, `vmware`… Tags are per Machine (every
+Interface shares them), comma-separated, lowercase `[a-z0-9_-]`. They feed
+[scan targeting](scanning.md#scan-targeting) and [Automation conditions](automations.md).
+
+Tags can be **manual** (the auditor typed them in the inventory) or **derived** (computed by a tag
+Automation from Scan results). Derived tags are read-only: they appear in the report and in the editor but are
+never written to `inventory.csv`.
+
 ### Your own columns
 
 Owner, criticality, OS, notes…: extra columns are allowed and shown in the report, with no logic attached. A
-header line is then required to name them: `ip;zone;type;name;owner;criticality`.
+header line is then required to name them: `ip;zone;type;name;tags;owner;criticality`.
 
 ## Names from the Scans
 

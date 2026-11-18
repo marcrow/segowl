@@ -51,12 +51,15 @@ engagement.
 
 - **Build the right nmap command**: ports found by product, tag or vendor (2 700+ Port Labels, IT and OT),
   options explained, one script per Source.
-- **Several Sources, one method**: each Source scans the whole inventory minus itself; the coverage is
-  complete the first time.
+- **Several Sources, one method**: each Source scans the inventory minus itself, optionally narrowed by Zone
+  or Machine Tag; the coverage is complete the first time.
+- **Automations**: tag Machines from results (e.g. `probably-windows`) and target the second scan at them, or
+  exclude known noise so the matrix shows the real Findings.
 - **Findings, not noise**: only an explicit deny makes a Finding; undecided open flows are listed apart,
   never buried.
 - **Retest after the fix**: drop the new Scan next to the old one, the change shows cell by cell.
-- **Your method travels**: Kits carry your Scan Profiles, Port Groups and Port Labels from Mission to Mission.
+- **Your method travels**: Kits carry your Scan Profiles, Port Groups, Port Labels and portable Automations
+  from Mission to Mission.
 
 ## Quick start
 

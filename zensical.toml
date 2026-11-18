@@ -19,6 +19,7 @@ nav = [
     "guide/mission-folder.md",
     "guide/scanning.md",
     "guide/auditor-kit.md",
+    "guide/automations.md",
     "guide/flow-policy.md",
     "guide/report.md",
     "guide/lab.md",

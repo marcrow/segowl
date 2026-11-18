@@ -1,7 +1,7 @@
 # Auditor Kit
 
-Your tooling, carried from Mission to Mission: **Scan Profiles**, **Port Groups** and **Port Labels**. A kit never
-contains client data: no inventory, no Flow Policy, no Scan, no IP.
+Your tooling, carried from Mission to Mission: **Scan Profiles**, **Port Groups**, **Port Labels** and portable
+**Automations**. A kit never contains client data: no inventory, no Flow Policy, no Scan, no IP.
 
 **Everything is editable.** The port list is yours: add labels, vendors and tags, create groups, tune profiles.
 Each audit can enrich the kit, and the next scan command is better for it.
@@ -11,6 +11,7 @@ Each audit can enrich the kit, and the next scan command is better for it.
 | **Scan Profile** | A named nmap recipe: ports + options, no target. One ready-to-run command per Source. | `scan_profiles.csv` |
 | **Port Group** | A named set of ports (`admin`, `db`, `web`…), usable in profiles and in the Flow Policy as `@admin`. | `port_groups.csv` |
 | **Port Label** | A port described: product, vendor, tags (`admin`, `backup`, `oob`, `risky`…), cleartext. Helps find ports; filters nothing. | `port_labels.csv` |
+| **Automation** | Portable condition → action rules (tag or exclude). Only Automations that use `port`, `state`, `protocol` or `tag` travel in the Kit. | `automations.ini` |
 
 ## Scan Profiles
 
@@ -47,8 +48,9 @@ services may share a port.
 
 ## Kits
 
-**Auditor Kit › Kits** saves the Mission's three files as a kit, imports a kit zip, or reads kit folders.
+**Auditor Kit › Kits** saves the Mission's four files as a kit, imports a kit zip, or reads kit folders.
 Applying a kit shows a row-by-row diff with the Mission: you pick which of its files replace the Mission's.
+Portable [Automations](automations.md) (conditions on ports, states, protocols or tags only) are included.
 
 !!! tip "Share your method with git"
     Every sub-folder of a kit folder is a kit. Point a kit folder at a private repo, `git pull` it, and the
